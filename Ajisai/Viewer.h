@@ -3,6 +3,7 @@
 #include "Model.h"
 #include "Device.h"
 #include "Object.h"
+#include "Camera.h"
 
 #define AJISAI_NEW_IMPLEMENT
 
@@ -25,6 +26,7 @@ struct UniformBufferObject {
 	glm::mat4 mat_toWorld;
 	glm::mat4 mat_toCamera;
 	glm::mat4 mat_toFrustum;
+	glm::vec4 camPosition;
 };
 
 class Viewer
@@ -94,6 +96,7 @@ private:
 
 	Ajisai::Object mObject;
 	Ajisai::Model mModelNanoSuit;
+	Ajisai::Camera mCam;
 	void InitObjects();
 	// Buffers
 	//Model m_model;

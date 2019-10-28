@@ -1737,6 +1737,8 @@ void Viewer::CreateUniformBuffers() {
 		CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_uniformBuffers[i], m_uniformBuffersMemory[i]);
 	}
 #else
+	mCam.Initialize();
+
 	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
 	m_uniformBuffers.resize(m_swapChainImages.size());
@@ -1773,13 +1775,13 @@ void Viewer::UpdateUniformBuffer(uint32_t imageIndex) {
 	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 	//time = time + 0.001f;
 	UniformBufferObject ubo = {};
-	ubo.mat_toWorld = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	ubo.mat_toWorld = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f)/10.0f, glm::vec3(0.0f, 1.0f, 0.0f));
 	//ubo.mat_toWorld = glm::mat4(1.0f);
-	ubo.mat_toCamera = glm::lookAt(glm::vec3(13.0f, 13.0f, 13.0f), glm::vec3(0.0f, 8.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	ubo.mat_toCamera = mCam.mMatToCam;
 	//ubo.mat_toCamera = glm::lookAt(glm::vec3(4.0f, 4.0f, 4.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	ubo.mat_toFrustum = glm::perspective(glm::radians(45.0f), m_swapChainExtent.width / (float)m_swapChainExtent.height, 0.1f, 250.0f);
-
+	ubo.mat_toFrustum = mCam.mMatToFrustum;
 	ubo.mat_toFrustum[1][1] *= -1;
+	ubo.camPosition = glm::vec4(mCam.mCamPos, 1.0f);
 
 	void* data;
 	vkMapMemory(mDevice.mLogicalDevice, m_uniformBuffersMemory[imageIndex], 0, sizeof(ubo), 0, &data);
