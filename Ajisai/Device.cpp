@@ -141,4 +141,11 @@ namespace Ajisai {
 		vkFreeCommandBuffers(mLogicalDevice, mCommandPool, 1, &commandBuffer);
 
 	}
+
+	void Device::DestroyDebugUtilsMessengerEXT() {
+		auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(mInstance, "vkDestroyDebugUtilsMessengerEXT");
+		if (func != nullptr) {
+			func(mInstance, mDebugMessenger, nullptr);
+		}
+	}
 }

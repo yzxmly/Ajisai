@@ -9,6 +9,7 @@ namespace Ajisai {
 		VkImage mImage;
 		VkImageView mImageView;
 		VkDeviceMemory mImageMemory;
+		VkFormat mFormat;
 
 		void CreateImage(Device *device, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties);
 		void CreateImageView(Device *device, VkFormat format, VkImageAspectFlags aspectFlags);

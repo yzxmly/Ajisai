@@ -26,6 +26,8 @@ namespace Ajisai {
 		}
 
 		void LoadObject(std::string filePath);
+		void MakeScreen();
+		void MakeGround(float xWidth, float y, float zWidth);
 		std::vector<VkDescriptorImageInfo> TextureInfo(size_t meshIdx);
 
 		void CleanUp();

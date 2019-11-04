@@ -11,7 +11,9 @@ layout(location = 2) in vec3 fragNormal;
 layout(location = 3) in vec3 camPos;
 layout(location = 4) in mat3 matTBN;
 
-layout(location = 0) out vec4 outColor;
+layout(location = 0) out vec4 outPosition;
+layout(location = 1) out vec4 outNormal;
+layout(location = 2) out vec4 outDiffuse;
 
 void main() {
 	vec3 direction = normalize(vec3(-0.5f,-0.1f,-0.5f));
@@ -31,6 +33,9 @@ void main() {
 	float specIntensity = pow(max(dot(halfwayDirection, normal), 0.0), 32);
 	vec3 colorSpecular = intensity * lightColor * vec3(texture(texSampler_specular, fragTexCoord));
 	
-    //outColor = texture(texSampler_specular, fragTexcoord * 2.0);
-	outColor = vec4(colorSpecular,1.0f);
+	outPosition = vec4(fragPosition, 1.0);
+	outPosition = vec4(normal, 1.0);
+	outNormal = vec4(fragNormal, 1.0);
+	outDiffuse = texture(texSampler_diffuse, fragTexCoord);
+
 }

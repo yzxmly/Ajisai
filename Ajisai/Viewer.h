@@ -42,81 +42,96 @@ private:
 	// GLFW objects
 	int mWidth = 800, mHeight = 600;
 	GLFWwindow* mWindow;
-
-
-	// GLFW objects
-	int m_width = 800;
-	int m_height = 600;
-	//float time = 0.0f;
-	GLFWwindow* m_window;
+	bool m_windowResized = false;
 
 	// Vulkan objects
-	VkInstance m_instance;
-	VkDebugUtilsMessengerEXT m_debugMessenger;
-	VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
-	VkDevice m_device;
-	VkQueue m_graphicsQueue;
-
 	Ajisai::Device mDevice;
 
 	// Window surface objects
 	VkSurfaceKHR m_surface;
-	VkQueue m_presentQueue;
 	VkSwapchainKHR m_swapChain;
 	std::vector<VkImage> m_swapChainImages;
 	VkFormat m_swapChainImageFormat;
 	VkExtent2D m_swapChainExtent;
 	std::vector<VkImageView> m_swapChainImageViews;
 
-	// Pipeline Object
-	VkRenderPass m_renderPass;
-	VkPipeline m_pipeline;
-	VkDescriptorSetLayout m_descriptorSetLayout;
-	VkDescriptorSetLayout mUniformBufferLayout;
-	VkDescriptorSetLayout mSamplerLayout;
-	VkDescriptorPool m_descriptorPool;
-	std::vector<VkDescriptorSet> m_descriptorSets;
-	std::vector<VkDescriptorSet> mUniformDescriptorSets;
-	std::vector<VkDescriptorSet> mSamplerDescriptorSets;
-	VkPipelineLayout m_pipelineLayout;
-	std::vector<VkFramebuffer> m_framebuffers;
-	bool m_windowResized = false;
+	// models
+	struct {
+		Ajisai::Model debugScreen;
+		Ajisai::Model ground;
+		Ajisai::Model nanoSuit;
+	} mModels;
 
-	// Command Pool
-	VkCommandPool m_commandPool;
-	std::vector<VkCommandBuffer> m_commandBuffers;
+	// Pipeline Object
+	VkDescriptorPool m_descriptorPool;
+
+	struct {
+		VkRenderPass debug;
+	} mRenderPasses;
+
+	struct {
+		std::vector<VkFramebuffer> debug;
+	} mFrameBuffers;
+
+	struct {
+		VkPipeline offscreen;
+		VkPipeline deferred;
+		VkPipeline debug;
+	} mPipelines;
+
+	struct {
+		VkPipelineLayout offscreen;
+		VkPipelineLayout deferred;
+		VkPipelineLayout debug;
+	} mPipelineLayouts;
+
+	struct{
+		int32_t width, height;
+		VkFramebuffer frameBuffer;
+		Ajisai::Image position, normal, diffuse;
+		Ajisai::Image depth;
+		VkRenderPass renderPass;
+	} mOffscreenFrameBuffer;
+
+	struct {
+		VkDescriptorSetLayout debugSampler;
+		VkDescriptorSetLayout offscreenUniform;
+		VkDescriptorSetLayout offscreenSampler;
+		VkDescriptorSetLayout deferredSampler;
+	} mDescriptorSetLayouts;
+
+	VkSampler mSampler;
+
+	// descriptorsets 
+	struct {
+		std::vector<VkDescriptorSet> debugSampler;
+		std::vector<VkDescriptorSet> offscreenUniform;
+		std::vector<VkDescriptorSet> offscreenSampler;
+	} mDescriptorSets;
+
+	// commandbuffer
+	struct {
+		std::vector<VkCommandBuffer> debug;
+		std::vector<VkCommandBuffer> deferred;
+		std::vector<VkCommandBuffer> offscreen;
+	} mCommandBuffers;
 	
 	// Synchronization
 	static const int MAX_FRAMES_IN_FLIGHT = 3;
-	VkSemaphore m_imageAvailableSemaphore, m_renderFinishedSemaphore;
-	std::vector<VkSemaphore> m_imageAvailableSemaphores;
-	std::vector<VkSemaphore> m_renderFinishedSemaphores;
+
+	struct {
+		std::vector<VkSemaphore> imageAvailable;
+		std::vector<VkSemaphore> offscreenFinished;
+		std::vector<VkSemaphore> renderingFinished;
+	} mSemaphores;
+
 	std::vector<VkFence> m_inFlightFences;
 	size_t m_currentFrame = 0;
 
-	Ajisai::Object mObject;
-	Ajisai::Model mModelNanoSuit;
 	Ajisai::Camera mCam;
-	void InitObjects();
-	// Buffers
-	//Model m_model;
-	VkBuffer m_vertexBuffer;
-	VkDeviceMemory m_vertexBufferMemory;
-
-	VkBuffer m_indexBuffer;
-	VkDeviceMemory m_indexBufferMemory;
 
 	std::vector<VkBuffer> m_uniformBuffers;
 	std::vector<VkDeviceMemory> m_uniformBuffersMemory;
-
-	VkImage m_textureImage;
-	VkDeviceMemory m_textureImageMemory;
-	VkImageView m_textureImageView;
-	VkSampler m_textureSampler;
-
-	VkImage m_depthImage;
-	VkDeviceMemory m_depthImageMemory;
-	VkImageView m_depthImageView;
 
 	// Initialize GLFW
 	void InitWindow();
@@ -143,6 +158,8 @@ private:
 
 	void CreateLogicalDevice();
 
+	void CreateCommandPool();
+
 	// Initialize Window Surface
 	void CreateSurface();
 	
@@ -154,38 +171,35 @@ private:
 
 	void CreateSwapChainImageViews();
 
-	void CleanupSwapChain();
+	// models
+	void InitObjects();
 
 	// Renderpass Pipeline and Framebuffer
-	void CreateRenderPass();
-	void CreateDescriptorSetLayout();
-	void CreateGraphicsPipeline();
+	void CreateDebugPipeline();
+	void CreateDebugRenderPass();
+	void CreateDebugFrameBuffers();
+	void CreateDebugDescriptorSetLayout();
+	void CreateDebugDescriptorSets();
+	void CreateDebugCommandBuffers();
+
+	void CreateOffscreenFramebuffer();
+	void CreateOffscreenDescriptorSetLayout();
+	void CreateOffscreenPipeline();
+	void CreateOffscreenDiscriptorSets();
+	void CreateOffscreenCommandBuffers();
+
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
-	void CreateFramebuffers();
-
-	// Command Pool and buffer
-	void CreateCommandPool();
-	void CreateCommandBuffers();
-
-	VkCommandBuffer BeginSingleTimeCommands();
-	void EndSingleTimeCommands(VkCommandBuffer commandBuffer);
-
-	void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-	void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
 	// Synchronization
 	void CreateSyncObjects();
 
 	// Buffers
-	void CreateVertexBuffer();
-	void CreateIndexBuffer();
 	void CreateUniformBuffers();
 	void UpdateUniformBuffer(uint32_t imageIndex);
 	void CreateDescriptorPool();
-	void CreateDescriptorSets();
+
 	void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
-	void CreateDepthResources();
+
 	VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 	VkFormat FindDepthFormat();
 	bool HasStencilComponent(VkFormat format);
@@ -195,8 +209,6 @@ private:
 
 	static std::vector<char> ReadFile(const std::string& filename);
 
-	void CreateTextureImage();
-	void CreateTextureImageView();
 	void CreateTextureSampler();
 
 	VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
@@ -205,6 +217,6 @@ private:
 	void DrawFrame();
 
 	void CleanUp();
-	void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator);
+	void CleanupSwapChain();
 };
 

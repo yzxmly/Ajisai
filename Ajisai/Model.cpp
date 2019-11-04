@@ -40,6 +40,81 @@ namespace Ajisai {
 
 	}
 
+	void Model::MakeScreen() {
+		mMeshes.resize(1);
+		mMeshes[0].mVertices.resize(4);
+		mMeshes[0].mIndices.resize(6);
+
+		mMeshes[0].mVertices[0].pos = glm::vec3(-1.0f, 1.0f, 0.0f);
+		mMeshes[0].mVertices[1].pos = glm::vec3(-1.0f, -1.0f, 0.0f);
+		mMeshes[0].mVertices[2].pos = glm::vec3(1.0f, 1.0f, 0.0f);
+		mMeshes[0].mVertices[3].pos = glm::vec3(1.0f, -1.0f, 0.0f);
+
+		mMeshes[0].mVertices[0].normal = glm::vec3(-1.0f, 1.0f, 0.0f);
+		mMeshes[0].mVertices[1].normal = glm::vec3(-1.0f, -1.0f, 0.0f);
+		mMeshes[0].mVertices[2].normal = glm::vec3(1.0f, 1.0f, 0.0f);
+		mMeshes[0].mVertices[3].normal = glm::vec3(1.0f, -1.0f, 0.0f);
+
+		mMeshes[0].mVertices[0].tangent = glm::vec3(-1.0f, 1.0f, 0.0f);
+		mMeshes[0].mVertices[1].tangent = glm::vec3(-1.0f, -1.0f, 0.0f);
+		mMeshes[0].mVertices[2].tangent = glm::vec3(1.0f, 1.0f, 0.0f);
+		mMeshes[0].mVertices[3].tangent = glm::vec3(1.0f, -1.0f, 0.0f);
+
+		mMeshes[0].mVertices[0].bitangent = glm::vec3(-1.0f, 1.0f, 0.0f);
+		mMeshes[0].mVertices[1].bitangent = glm::vec3(-1.0f, -1.0f, 0.0f);
+		mMeshes[0].mVertices[2].bitangent = glm::vec3(1.0f, 1.0f, 0.0f);
+		mMeshes[0].mVertices[3].bitangent = glm::vec3(1.0f, -1.0f, 0.0f);
+
+		mMeshes[0].mIndices[0] = 0;
+		mMeshes[0].mIndices[1] = 2;
+		mMeshes[0].mIndices[2] = 1;
+		mMeshes[0].mIndices[3] = 1;
+		mMeshes[0].mIndices[4] = 2;
+		mMeshes[0].mIndices[5] = 3;
+
+		mMeshes[0].CreateBuffers(mDevice);
+	}
+
+	void Model::MakeGround(float xWidth, float y, float zWidth) {
+		mMeshes.resize(1);
+		mMeshes[0].mVertices.resize(4);
+		mMeshes[0].mIndices.resize(6);
+
+		mMeshes[0].mVertices[0].pos = glm::vec3(-xWidth, y, -zWidth);
+		mMeshes[0].mVertices[1].pos = glm::vec3(-xWidth, y, zWidth);
+		mMeshes[0].mVertices[2].pos = glm::vec3(xWidth, y, -zWidth);
+		mMeshes[0].mVertices[3].pos = glm::vec3(xWidth, y, zWidth);
+
+		mMeshes[0].mVertices[0].normal = glm::vec3(0.0f, 1.0f, 0.0f);
+		mMeshes[0].mVertices[1].normal = glm::vec3(0.0f, 1.0f, 0.0f);
+		mMeshes[0].mVertices[2].normal = glm::vec3(0.0f, 1.0f, 0.0f);
+		mMeshes[0].mVertices[3].normal = glm::vec3(0.0f, 1.0f, 0.0f);
+
+		mMeshes[0].mVertices[0].tangent = glm::vec3(0.0f, 0.0f, 1.0f);
+		mMeshes[0].mVertices[1].tangent = glm::vec3(0.0f, 0.0f, 1.0f);
+		mMeshes[0].mVertices[2].tangent = glm::vec3(0.0f, 0.0f, 1.0f);
+		mMeshes[0].mVertices[3].tangent = glm::vec3(0.0f, 0.0f, 1.0f);
+
+		mMeshes[0].mVertices[0].bitangent = glm::vec3(1.0f, 0.0f, 0.0f);
+		mMeshes[0].mVertices[1].bitangent = glm::vec3(1.0f, 0.0f, 0.0f);
+		mMeshes[0].mVertices[2].bitangent = glm::vec3(1.0f, 0.0f, 0.0f);
+		mMeshes[0].mVertices[3].bitangent = glm::vec3(1.0f, 0.0f, 0.0f);
+
+		mMeshes[0].mVertices[0].texCoord = glm::vec2(0.0f, 1.0f);
+		mMeshes[0].mVertices[1].texCoord = glm::vec2(0.0f, 0.0f);
+		mMeshes[0].mVertices[2].texCoord = glm::vec2(1.0f, 1.0f);
+		mMeshes[0].mVertices[3].texCoord = glm::vec2(1.0f, 0.0f);
+
+		mMeshes[0].mIndices[0] = 0;
+		mMeshes[0].mIndices[1] = 2;
+		mMeshes[0].mIndices[2] = 1;
+		mMeshes[0].mIndices[3] = 1;
+		mMeshes[0].mIndices[4] = 2;
+		mMeshes[0].mIndices[5] = 3;
+
+		mMeshes[0].CreateBuffers(mDevice);
+	}
+
 	void Model::InitializeTexture(aiMaterial *mat, aiTextureType type, std::string typeName) {
 		for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
 			aiString str;

@@ -133,6 +133,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <None Include="debug.frag" />
+    <None Include="debug.vert" />
+    <None Include="debug.vert.spv" />
     <None Include="packages.config" />
     <None Include="shader.frag" />
     <None Include="shader.vert" />

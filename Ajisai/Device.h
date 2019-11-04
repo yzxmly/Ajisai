@@ -48,6 +48,8 @@ namespace Ajisai {
 			vkDeviceWaitIdle(mLogicalDevice);
 		}
 		void CleanUp();
+
+		void DestroyDebugUtilsMessengerEXT();
 	};
 }
 
