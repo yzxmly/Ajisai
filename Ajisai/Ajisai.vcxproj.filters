@@ -35,6 +35,9 @@
     <None Include="debug.vert.spv">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="shadow.vert">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Viewer.cpp">

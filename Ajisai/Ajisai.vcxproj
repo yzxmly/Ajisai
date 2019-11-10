@@ -139,6 +139,7 @@
     <None Include="packages.config" />
     <None Include="shader.frag" />
     <None Include="shader.vert" />
+    <None Include="shadow.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Buffer.cpp" />

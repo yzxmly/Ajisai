@@ -29,6 +29,12 @@ struct UniformBufferObject {
 	glm::vec4 camPosition;
 };
 
+struct LightSpaceUniformBufferObject {
+	glm::mat4 matToWorld;
+	glm::mat4 matToLight;
+	glm::mat4 matToFrustum;
+};
+
 class Viewer
 {
 public:
@@ -74,12 +80,14 @@ private:
 	} mFrameBuffers;
 
 	struct {
+		VkPipeline shadowMap;
 		VkPipeline offscreen;
 		VkPipeline deferred;
 		VkPipeline debug;
 	} mPipelines;
 
 	struct {
+		VkPipelineLayout shadowMap;
 		VkPipelineLayout offscreen;
 		VkPipelineLayout deferred;
 		VkPipelineLayout debug;
@@ -94,7 +102,16 @@ private:
 	} mOffscreenFrameBuffer;
 
 	struct {
+		int32_t width, height;
+		VkFramebuffer frameBuffer;
+		Ajisai::Image depth;
+		VkRenderPass renderPass;
+		VkSampler depthSampler;
+	} mShadowMapFrameBuffer;
+
+	struct {
 		VkDescriptorSetLayout debugSampler;
+		VkDescriptorSetLayout shadowMapUniform;
 		VkDescriptorSetLayout offscreenUniform;
 		VkDescriptorSetLayout offscreenSampler;
 		VkDescriptorSetLayout deferredSampler;
@@ -105,15 +122,24 @@ private:
 	// descriptorsets 
 	struct {
 		std::vector<VkDescriptorSet> debugSampler;
+		std::vector<VkDescriptorSet> shadowMapUniform;
 		std::vector<VkDescriptorSet> offscreenUniform;
 		std::vector<VkDescriptorSet> offscreenSampler;
 	} mDescriptorSets;
+
+	struct {
+		Ajisai::Buffer shadowLightVS;
+		Ajisai::Buffer deferredLightFS;
+		std::vector<Ajisai::Buffer> offscreenVS;
+		std::vector<Ajisai::Buffer> shadowMapVS;
+	} mUniformBuffers;
 
 	// commandbuffer
 	struct {
 		std::vector<VkCommandBuffer> debug;
 		std::vector<VkCommandBuffer> deferred;
 		std::vector<VkCommandBuffer> offscreen;
+		std::vector<VkCommandBuffer> shadowMap;
 	} mCommandBuffers;
 	
 	// Synchronization
@@ -122,6 +148,7 @@ private:
 	struct {
 		std::vector<VkSemaphore> imageAvailable;
 		std::vector<VkSemaphore> offscreenFinished;
+		std::vector<VkSemaphore> shadowMapFinished;
 		std::vector<VkSemaphore> renderingFinished;
 	} mSemaphores;
 
@@ -187,6 +214,12 @@ private:
 	void CreateOffscreenPipeline();
 	void CreateOffscreenDiscriptorSets();
 	void CreateOffscreenCommandBuffers();
+
+	void CreateShadowFramebuffer();
+	void CreateShadowDescriptorSetLayout();
+	void CreateShadowPipeline();
+	void CreateShadowDiscriptorSets();
+	void CreateShadowCommandBuffers();
 
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
 

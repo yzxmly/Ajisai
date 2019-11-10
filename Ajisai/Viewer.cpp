@@ -68,15 +68,22 @@ void Viewer::InitVulkan() {
 	CreateOffscreenDescriptorSetLayout();
 	CreateOffscreenPipeline();
 
+	// shadowMap pipeline
+	CreateShadowFramebuffer();
+	CreateShadowDescriptorSetLayout();
+	CreateShadowPipeline();
+
 	// descriptors
 	CreateDescriptorPool();
 	CreateUniformBuffers();
 	CreateOffscreenDiscriptorSets();
 	CreateDebugDescriptorSets();
+	CreateShadowDiscriptorSets();
 
 	// commandbuffers
 	CreateOffscreenCommandBuffers();
 	CreateDebugCommandBuffers();
+	CreateShadowCommandBuffers();
 
 	CreateSyncObjects();
 #endif
@@ -112,16 +119,23 @@ void Viewer::RecreateSwapChain() {
 	CreateOffscreenFramebuffer();
 	//CreateOffscreenDescriptorSetLayout();
 	CreateOffscreenPipeline();
+	
+	// shadowMap pipeline
+	CreateShadowFramebuffer();
+	CreateShadowPipeline();
 
 	// descriptors
 	CreateDescriptorPool();
 	CreateUniformBuffers();
 	CreateOffscreenDiscriptorSets();
 	CreateDebugDescriptorSets();
+	CreateShadowDiscriptorSets();
 
 	// commandbuffers
 	CreateOffscreenCommandBuffers();
 	CreateDebugCommandBuffers();
+	CreateShadowCommandBuffers();
+
 #endif
 }
 
@@ -667,6 +681,27 @@ void Viewer::CreateDebugDescriptorSetLayout() {
 #endif
 }
 
+void Viewer::CreateShadowDescriptorSetLayout() {
+#ifndef AJISAI_NEW_IMPLEMENT
+#else
+	VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+	uboLayoutBinding.binding = 0;
+	uboLayoutBinding.descriptorCount = 1;
+	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uboLayoutBinding.pImmutableSamplers = nullptr;
+	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+	VkDescriptorSetLayoutCreateInfo uboCreateInfo = {};
+	uboCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	uboCreateInfo.bindingCount = 1;
+	uboCreateInfo.pBindings = &uboLayoutBinding;
+
+	if (vkCreateDescriptorSetLayout(mDevice.mLogicalDevice, &uboCreateInfo, nullptr, &mDescriptorSetLayouts.shadowMapUniform) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create descriptor set layout");
+	}
+#endif
+}
+
 void Viewer::CreateOffscreenDescriptorSetLayout() {
 #ifndef AJISAI_NEW_IMPLEMENT
 #else
@@ -717,6 +752,133 @@ void Viewer::CreateOffscreenDescriptorSetLayout() {
 	if (vkCreateDescriptorSetLayout(mDevice.mLogicalDevice, &samplerCreateInfo, nullptr, &mDescriptorSetLayouts.offscreenSampler) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create descriptor set layout");
 	}
+#endif
+}
+
+void Viewer::CreateShadowPipeline() {
+#ifndef AJISAI_NEW_IMPLEMENT
+
+#else
+	auto vertShaderCode = ReadFile("shadow.vert.spv");
+
+	auto vertShaderModule = CreateShaderModule(vertShaderCode);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageCreateInfo = {};
+	vertShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageCreateInfo.module = vertShaderModule;
+	vertShaderStageCreateInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageCreateInfo };
+
+	auto bindingDescription = Ajisai::Vertex::GetBindingDescription();
+	auto attributeDescriptions = Ajisai::Vertex::GetAttributeDescriptions();
+
+	VkPipelineVertexInputStateCreateInfo vertexInputStageCreateInfo = {};
+	vertexInputStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputStageCreateInfo.vertexBindingDescriptionCount = 1;
+	vertexInputStageCreateInfo.pVertexBindingDescriptions = &bindingDescription;
+	vertexInputStageCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+	vertexInputStageCreateInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStageCreateInfo = {};
+	inputAssemblyStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssemblyStageCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssemblyStageCreateInfo.primitiveRestartEnable = VK_FALSE;
+
+	VkPipelineRasterizationStateCreateInfo rasterizationStageCreateInfo = {};
+	rasterizationStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizationStageCreateInfo.depthClampEnable = VK_FALSE;
+	rasterizationStageCreateInfo.rasterizerDiscardEnable = VK_FALSE;
+	rasterizationStageCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizationStageCreateInfo.lineWidth = 1.0f;
+	rasterizationStageCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizationStageCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterizationStageCreateInfo.depthBiasEnable = VK_FALSE;
+	rasterizationStageCreateInfo.depthBiasConstantFactor = 0.0f;
+	rasterizationStageCreateInfo.depthBiasClamp = 0.0f;
+	rasterizationStageCreateInfo.depthBiasSlopeFactor = 0.0f;
+
+	VkPipelineDepthStencilStateCreateInfo dsCreateInfo = {};
+	dsCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	dsCreateInfo.depthTestEnable = VK_TRUE;
+	dsCreateInfo.depthWriteEnable = VK_TRUE;
+	dsCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+	dsCreateInfo.depthBoundsTestEnable = VK_FALSE;
+	dsCreateInfo.minDepthBounds = 0.0f;
+	dsCreateInfo.maxDepthBounds = 1.0f;
+	dsCreateInfo.stencilTestEnable = VK_FALSE;
+	dsCreateInfo.front = {};
+	dsCreateInfo.back = {};
+
+	VkPipelineViewportStateCreateInfo viewportStageCreateInfo = {};
+	viewportStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportStageCreateInfo.viewportCount = 1;
+	viewportStageCreateInfo.pViewports = nullptr;
+	viewportStageCreateInfo.scissorCount = 1;
+	viewportStageCreateInfo.pScissors = nullptr;
+
+	VkPipelineMultisampleStateCreateInfo multisamplingStageCreateInfo = {};
+	multisamplingStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisamplingStageCreateInfo.sampleShadingEnable = VK_FALSE;
+	multisamplingStageCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+	
+	VkPipelineColorBlendStateCreateInfo colorBlendStageCreateInfo = {};
+	colorBlendStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlendStageCreateInfo.logicOpEnable = VK_FALSE;
+	colorBlendStageCreateInfo.logicOp = VK_LOGIC_OP_COPY;
+	colorBlendStageCreateInfo.attachmentCount = 0;
+	colorBlendStageCreateInfo.pAttachments = nullptr;
+
+	std::array<VkDynamicState, 2> dynamicStages = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR,
+	};
+
+	VkPipelineDynamicStateCreateInfo dynamicStageCreateInfo = {};
+	dynamicStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicStageCreateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStages.size());
+	dynamicStageCreateInfo.pDynamicStates = dynamicStages.data();
+
+	std::array<VkDescriptorSetLayout, 1> setLayouts = { mDescriptorSetLayouts.shadowMapUniform };
+	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
+	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+	pipelineLayoutCreateInfo.pSetLayouts = setLayouts.data();
+	pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+	pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+
+	if (vkCreatePipelineLayout(mDevice.mLogicalDevice, &pipelineLayoutCreateInfo, nullptr, &mPipelineLayouts.shadowMap) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create pipeline layout");
+	}
+
+	VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
+	pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipelineCreateInfo.stageCount = 1;
+	pipelineCreateInfo.pStages = shaderStages;
+
+	pipelineCreateInfo.pVertexInputState = &vertexInputStageCreateInfo;
+	pipelineCreateInfo.pInputAssemblyState = &inputAssemblyStageCreateInfo;
+	pipelineCreateInfo.pRasterizationState = &rasterizationStageCreateInfo;
+	pipelineCreateInfo.pViewportState = &viewportStageCreateInfo;
+	pipelineCreateInfo.pMultisampleState = &multisamplingStageCreateInfo;
+	pipelineCreateInfo.pDepthStencilState = &dsCreateInfo;
+	pipelineCreateInfo.pColorBlendState = &colorBlendStageCreateInfo;
+	pipelineCreateInfo.pDynamicState = &dynamicStageCreateInfo;
+
+	pipelineCreateInfo.layout = mPipelineLayouts.shadowMap;
+	pipelineCreateInfo.renderPass = mShadowMapFrameBuffer.renderPass;
+	pipelineCreateInfo.subpass = 0;
+
+	pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
+	pipelineCreateInfo.basePipelineIndex = -1;
+
+	if (vkCreateGraphicsPipelines(mDevice.mLogicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &mPipelines.shadowMap) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create pipeline");
+	}
+
+	vkDestroyShaderModule(mDevice.mLogicalDevice, vertShaderModule, nullptr);
 #endif
 }
 
@@ -1060,6 +1222,102 @@ std::vector<char> Viewer::ReadFile(const std::string& filename) {
 	return buffer;
 }
 
+void Viewer::CreateShadowFramebuffer() {
+	mShadowMapFrameBuffer.width = 1000;
+	mShadowMapFrameBuffer.height = 1000;
+
+	// depth attachment
+	mShadowMapFrameBuffer.depth.CreateImage(&mDevice, mShadowMapFrameBuffer.width, mShadowMapFrameBuffer.height, VK_FORMAT_D16_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	mShadowMapFrameBuffer.depth.CreateImageView(&mDevice, VK_FORMAT_D16_UNORM, VK_IMAGE_ASPECT_DEPTH_BIT);
+	
+	VkAttachmentDescription attachmentDesc = {};
+	attachmentDesc.format = VK_FORMAT_D16_UNORM;
+	attachmentDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	attachmentDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachmentDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	attachmentDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachmentDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachmentDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachmentDesc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+	VkAttachmentReference depthReference;
+	depthReference.attachment = 0;
+	depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.pColorAttachments = nullptr;
+	subpass.colorAttachmentCount = 0;
+	subpass.pDepthStencilAttachment = &depthReference;
+
+	std::array<VkSubpassDependency, 2> dependencies;
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	dependencies[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	VkRenderPassCreateInfo renderPassCreateInfo = {};
+	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassCreateInfo.pAttachments = &attachmentDesc;
+	renderPassCreateInfo.attachmentCount = 1;
+	renderPassCreateInfo.subpassCount = 1;
+	renderPassCreateInfo.pSubpasses = &subpass;
+	renderPassCreateInfo.dependencyCount = 2;
+	renderPassCreateInfo.pDependencies = dependencies.data();
+
+	if (vkCreateRenderPass(mDevice.mLogicalDevice, &renderPassCreateInfo, nullptr, &mShadowMapFrameBuffer.renderPass) != VK_SUCCESS) {
+		throw(std::runtime_error("failed to create offscreen renderPass"));
+	}
+
+	VkImageView attachment = mShadowMapFrameBuffer.depth.mImageView;
+
+	VkFramebufferCreateInfo fbufCreateInfo = {};
+	fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fbufCreateInfo.pNext = nullptr;
+	fbufCreateInfo.renderPass = mShadowMapFrameBuffer.renderPass;
+	fbufCreateInfo.attachmentCount = 1;
+	fbufCreateInfo.pAttachments = &attachment;
+	fbufCreateInfo.width = mShadowMapFrameBuffer.width;
+	fbufCreateInfo.height = mShadowMapFrameBuffer.height;
+	fbufCreateInfo.layers = 1;
+
+	if (vkCreateFramebuffer(mDevice.mLogicalDevice, &fbufCreateInfo, nullptr, &mShadowMapFrameBuffer.frameBuffer) != VK_SUCCESS) {
+		throw(std::runtime_error("failed to create offscreen framebuffer"));
+	}
+
+	VkSamplerCreateInfo samplerCreateInfo = {};
+	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+	samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerCreateInfo.anisotropyEnable = VK_TRUE;
+	samplerCreateInfo.maxAnisotropy = 1.0f;
+	samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerCreateInfo.compareEnable = VK_FALSE;
+	samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerCreateInfo.mipLodBias = 0.0f;
+	samplerCreateInfo.minLod = 0.0f;
+	samplerCreateInfo.maxLod = 1.0f;
+
+	if (vkCreateSampler(mDevice.mLogicalDevice, &samplerCreateInfo, nullptr, &mShadowMapFrameBuffer.depthSampler) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create sampler");
+	}
+}
 
 void Viewer::CreateOffscreenFramebuffer() {
 	mOffscreenFrameBuffer.width = mWidth;
@@ -1237,6 +1495,85 @@ void Viewer::CreateCommandPool() {
 #endif
 }
 
+void Viewer::CreateShadowCommandBuffers() {
+#ifndef AJISAI_NEW_IMPLEMENT
+
+#else
+	mCommandBuffers.shadowMap.resize(m_swapChainImages.size());
+
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = mDevice.mCommandPool;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = (uint32_t)mCommandBuffers.shadowMap.size();
+
+	if (vkAllocateCommandBuffers(mDevice.mLogicalDevice, &allocInfo, mCommandBuffers.shadowMap.data()) != VK_SUCCESS) {
+		throw std::runtime_error("failed to allocate command buffer");
+	}
+
+	for (size_t i = 0; i < mCommandBuffers.shadowMap.size(); ++i) {
+		VkCommandBufferBeginInfo beginInfo = {};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = 0;
+		beginInfo.pInheritanceInfo = nullptr;
+
+		if (vkBeginCommandBuffer(mCommandBuffers.shadowMap[i], &beginInfo) != VK_SUCCESS) {
+			throw std::runtime_error("failed to begin recording command buffer");
+		}
+
+		VkRenderPassBeginInfo renderPassBeginInfo = {};
+		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassBeginInfo.renderPass = mShadowMapFrameBuffer.renderPass;
+		renderPassBeginInfo.framebuffer = mShadowMapFrameBuffer.frameBuffer;
+		renderPassBeginInfo.renderArea.offset = { 0, 0 };
+		renderPassBeginInfo.renderArea.extent.width = mShadowMapFrameBuffer.width;
+		renderPassBeginInfo.renderArea.extent.height = mShadowMapFrameBuffer.height;
+
+		std::array<VkClearValue, 1> clearValues = {};
+		clearValues[0].depthStencil = { 1.0f, 0 };
+
+		renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+		renderPassBeginInfo.pClearValues = clearValues.data();
+
+		vkCmdBeginRenderPass(mCommandBuffers.shadowMap[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		VkViewport viewport = {};
+		viewport.width = mShadowMapFrameBuffer.width;
+		viewport.height = mShadowMapFrameBuffer.height;
+		viewport.maxDepth = 1.0f;
+		viewport.minDepth = 0.0f;
+
+		vkCmdSetViewport(mCommandBuffers.shadowMap[i], 0, 1, &viewport);
+
+		VkRect2D scissor = {};
+		scissor.extent.width = mShadowMapFrameBuffer.width;
+		scissor.extent.height = mShadowMapFrameBuffer.height;
+		scissor.offset.x = 0;
+		scissor.offset.y = 0;
+
+		vkCmdSetScissor(mCommandBuffers.shadowMap[i], 0, 1, &scissor);
+
+		vkCmdBindPipeline(mCommandBuffers.shadowMap[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelines.shadowMap);
+
+		for (unsigned int j = 0; j < mModels.nanoSuit.mMeshes.size(); j++) {
+			VkBuffer vertexBuffers[] = { mModels.nanoSuit.mMeshes[j].mVertexBuffer.mBuffer };
+			std::array<VkDescriptorSet, 1> decriptorSets = { mDescriptorSets.shadowMapUniform[i] };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(mCommandBuffers.shadowMap[i], 0, 1, vertexBuffers, offsets);
+			vkCmdBindIndexBuffer(mCommandBuffers.shadowMap[i], mModels.nanoSuit.mMeshes[j].mIndexBuffer.mBuffer, 0, VK_INDEX_TYPE_UINT16);
+			vkCmdBindDescriptorSets(mCommandBuffers.shadowMap[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelineLayouts.shadowMap, 0, decriptorSets.size(), decriptorSets.data(), 0, nullptr);
+			vkCmdDrawIndexed(mCommandBuffers.shadowMap[i], static_cast<uint32_t>(mModels.nanoSuit.mMeshes[j].mIndices.size()), 1, 0, 0, 0);
+		}
+
+		vkCmdEndRenderPass(mCommandBuffers.shadowMap[i]);
+
+		if (vkEndCommandBuffer(mCommandBuffers.shadowMap[i]) != VK_SUCCESS) {
+			throw std::runtime_error("failed to record command buffer");
+		}
+	}
+#endif
+}
+
 void Viewer::CreateOffscreenCommandBuffers() {
 #ifndef AJISAI_NEW_IMPLEMENT
 	
@@ -1371,6 +1708,7 @@ void Viewer::CreateSyncObjects() {
 	mSemaphores.imageAvailable.resize(MAX_FRAMES_IN_FLIGHT);
 	mSemaphores.offscreenFinished.resize(MAX_FRAMES_IN_FLIGHT);
 	mSemaphores.renderingFinished.resize(MAX_FRAMES_IN_FLIGHT);
+	mSemaphores.shadowMapFinished.resize(MAX_FRAMES_IN_FLIGHT);
 
 	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
 	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -1383,6 +1721,7 @@ void Viewer::CreateSyncObjects() {
 		if (vkCreateSemaphore(mDevice.mLogicalDevice, &semaphoreCreateInfo, nullptr, &mSemaphores.imageAvailable[i])
 			|| vkCreateSemaphore(mDevice.mLogicalDevice, &semaphoreCreateInfo, nullptr, &mSemaphores.offscreenFinished[i])
 			|| vkCreateSemaphore(mDevice.mLogicalDevice, &semaphoreCreateInfo, nullptr, &mSemaphores.renderingFinished[i])
+			|| vkCreateSemaphore(mDevice.mLogicalDevice, &semaphoreCreateInfo, nullptr, &mSemaphores.shadowMapFinished[i])
 			|| vkCreateFence(mDevice.mLogicalDevice, &fenceCreateInfo, nullptr, &m_inFlightFences[i]) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create synchronization objects for a frame");
 		}
@@ -1404,6 +1743,12 @@ void Viewer::CreateUniformBuffers() {
 
 	for (size_t i = 0; i < m_uniformBuffers.size(); ++i) {
 		CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_uniformBuffers[i], m_uniformBuffersMemory[i]);
+	}
+
+	VkDeviceSize shadowMapVSBufferSize = sizeof(LightSpaceUniformBufferObject);
+	mUniformBuffers.shadowMapVS.resize(m_swapChainImages.size());
+	for (size_t i = 0; i < m_swapChainImages.size(); i++) {
+		mUniformBuffers.shadowMapVS[i].CreateBuffer(&mDevice, shadowMapVSBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
 #endif
 }
@@ -1430,6 +1775,17 @@ void Viewer::UpdateUniformBuffer(uint32_t imageIndex) {
 	vkMapMemory(mDevice.mLogicalDevice, m_uniformBuffersMemory[imageIndex], 0, sizeof(ubo), 0, &data);
 	memcpy(data, &ubo, sizeof(ubo));
 	vkUnmapMemory(mDevice.mLogicalDevice, m_uniformBuffersMemory[imageIndex]);
+
+	LightSpaceUniformBufferObject lightUbo = {};
+	lightUbo.matToWorld = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f) / 10.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+	lightUbo.matToLight = mCam.mMatToCam;
+	lightUbo.matToFrustum = mCam.mMatToFrustum;
+	lightUbo.matToFrustum[1][1] *= -1;
+
+	void* lightdata;
+	vkMapMemory(mDevice.mLogicalDevice, mUniformBuffers.shadowMapVS[imageIndex].mBufferMemory, 0, sizeof(lightUbo), 0, &lightdata);
+	memcpy(lightdata, &lightUbo, sizeof(lightUbo));
+	vkUnmapMemory(mDevice.mLogicalDevice, mUniformBuffers.shadowMapVS[imageIndex].mBufferMemory);
 #endif // ! AJISAI_NEW_IMPLEMENT
 }
 
@@ -1440,7 +1796,7 @@ void Viewer::CreateDescriptorPool() {
 	std::array<VkDescriptorPoolSize, 2> poolSizes = {};
 
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = static_cast<uint32_t>(m_swapChainImages.size());
+	poolSizes[0].descriptorCount = static_cast<uint32_t>(m_swapChainImages.size() * 2);
 
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	poolSizes[1].descriptorCount = static_cast<uint32_t>(mModels.nanoSuit.mMeshes.size() * 3 + 1);
@@ -1449,7 +1805,7 @@ void Viewer::CreateDescriptorPool() {
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	createInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 	createInfo.pPoolSizes = poolSizes.data();
-	createInfo.maxSets = static_cast<uint32_t>(m_swapChainImages.size() + mModels.nanoSuit.mMeshes.size() + 1);
+	createInfo.maxSets = static_cast<uint32_t>(m_swapChainImages.size() * 2 + mModels.nanoSuit.mMeshes.size() + 1);
 
 	if (vkCreateDescriptorPool(mDevice.mLogicalDevice, &createInfo, nullptr, &m_descriptorPool) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create descriptor pool");
@@ -1525,6 +1881,40 @@ void Viewer::CreateOffscreenDiscriptorSets() {
 	}
 }
 
+void Viewer::CreateShadowDiscriptorSets() {
+	// uniform buffer
+	std::vector<VkDescriptorSetLayout> uniformLayouts(m_swapChainImages.size(), mDescriptorSetLayouts.shadowMapUniform);
+	VkDescriptorSetAllocateInfo uniformAllocInfo = {};
+	uniformAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	uniformAllocInfo.descriptorPool = m_descriptorPool;
+	uniformAllocInfo.descriptorSetCount = static_cast<uint32_t>(m_swapChainImages.size());
+	uniformAllocInfo.pSetLayouts = uniformLayouts.data();
+
+	mDescriptorSets.shadowMapUniform.resize(m_swapChainImages.size());
+	if (vkAllocateDescriptorSets(mDevice.mLogicalDevice, &uniformAllocInfo, mDescriptorSets.shadowMapUniform.data()) != VK_SUCCESS) {
+		throw std::runtime_error("failed to allocate descriptor sets");
+	}
+
+	for (size_t i = 0; i < m_swapChainImages.size(); i++) {
+		VkDescriptorBufferInfo bufferInfo = {};
+		bufferInfo.buffer = mUniformBuffers.shadowMapVS[i].mBuffer;
+		bufferInfo.offset = 0;
+		bufferInfo.range = sizeof(LightSpaceUniformBufferObject);
+
+		std::vector<VkWriteDescriptorSet> descriptorWrites;
+		descriptorWrites.resize(1);
+		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[0].dstSet = mDescriptorSets.shadowMapUniform[i];
+		descriptorWrites[0].dstBinding = 0;
+		descriptorWrites[0].dstArrayElement = 0;
+		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrites[0].descriptorCount = 1;
+		descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+		vkUpdateDescriptorSets(mDevice.mLogicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+	}
+}
+
 void Viewer::CreateDebugDescriptorSets() {
 #ifndef AJISAI_NEW_IMPLEMENT
 	
@@ -1545,9 +1935,11 @@ void Viewer::CreateDebugDescriptorSets() {
 	}
 
 	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.imageView = mOffscreenFrameBuffer.position.mImageView;
-	imageInfo.sampler = mSampler;
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	//imageInfo.imageView = mOffscreenFrameBuffer.position.mImageView;
+	//imageInfo.sampler = mSampler;
+	imageInfo.imageView = mShadowMapFrameBuffer.depth.mImageView;
+	imageInfo.sampler = mShadowMapFrameBuffer.depthSampler;
 
 	VkWriteDescriptorSet descriptorWrite = {};
 	
@@ -1755,20 +2147,36 @@ void Viewer::DrawFrame() {
 		throw std::runtime_error("failed to sumbit offscreen draw command buufer");
 	}
 
+	VkSubmitInfo shadowMapSubmitInfo = {};
+	shadowMapSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	shadowMapSubmitInfo.waitSemaphoreCount = 0;
+	shadowMapSubmitInfo.pWaitSemaphores = nullptr;
+	shadowMapSubmitInfo.pWaitDstStageMask = nullptr;
+	shadowMapSubmitInfo.commandBufferCount = 1;
+	shadowMapSubmitInfo.pCommandBuffers = &mCommandBuffers.shadowMap[imageIndex];
+	shadowMapSubmitInfo.signalSemaphoreCount = 1;
+	shadowMapSubmitInfo.pSignalSemaphores = &mSemaphores.shadowMapFinished[m_currentFrame];
+
+	if (vkQueueSubmit(mDevice.mGraphicsQueue, 1, &shadowMapSubmitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+		throw std::runtime_error("failed to sumbit offscreen draw command buufer");
+	}
+
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
 	VkSemaphore waitSemaphores[] = {
 		mSemaphores.imageAvailable[m_currentFrame],
-		mSemaphores.offscreenFinished[m_currentFrame]
+		mSemaphores.offscreenFinished[m_currentFrame],
+		mSemaphores.shadowMapFinished[m_currentFrame]
 	};
 
 	VkPipelineStageFlags waitStages[] = { 
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT 
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
 	};
 
-	submitInfo.waitSemaphoreCount = 2;
+	submitInfo.waitSemaphoreCount = 3;
 	submitInfo.pWaitSemaphores = waitSemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
 	submitInfo.commandBufferCount = 1;
@@ -1819,6 +2227,7 @@ void Viewer::CleanUp() {
 		vkDestroySemaphore(mDevice.mLogicalDevice, mSemaphores.imageAvailable[i], nullptr);
 		vkDestroySemaphore(mDevice.mLogicalDevice, mSemaphores.offscreenFinished[i], nullptr);
 		vkDestroySemaphore(mDevice.mLogicalDevice, mSemaphores.renderingFinished[i], nullptr);
+		vkDestroySemaphore(mDevice.mLogicalDevice, mSemaphores.shadowMapFinished[i], nullptr);
 		vkDestroyFence(mDevice.mLogicalDevice, m_inFlightFences[i], nullptr);
 	}
 
@@ -1834,6 +2243,7 @@ void Viewer::CleanUp() {
 		vkDestroyDescriptorSetLayout(mDevice.mLogicalDevice, mDescriptorSetLayouts.debugSampler, nullptr);
 		vkDestroyDescriptorSetLayout(mDevice.mLogicalDevice, mDescriptorSetLayouts.offscreenUniform, nullptr);
 		vkDestroyDescriptorSetLayout(mDevice.mLogicalDevice, mDescriptorSetLayouts.offscreenSampler, nullptr);
+		vkDestroyDescriptorSetLayout(mDevice.mLogicalDevice, mDescriptorSetLayouts.shadowMapUniform, nullptr);
 	}
 
 	vkDestroySurfaceKHR(mDevice.mInstance, m_surface, nullptr);
@@ -1857,26 +2267,31 @@ void Viewer::CleanupSwapChain() {
 		}
 
 		vkDestroyFramebuffer(mDevice.mLogicalDevice, mOffscreenFrameBuffer.frameBuffer, nullptr);
+		vkDestroyFramebuffer(mDevice.mLogicalDevice, mShadowMapFrameBuffer.frameBuffer, nullptr);
 	}
 
 	{
 		vkFreeCommandBuffers(mDevice.mLogicalDevice, mDevice.mCommandPool, static_cast<uint32_t>(mCommandBuffers.debug.size()), mCommandBuffers.debug.data());
 		vkFreeCommandBuffers(mDevice.mLogicalDevice, mDevice.mCommandPool, static_cast<uint32_t>(mCommandBuffers.offscreen.size()), mCommandBuffers.offscreen.data());
+		vkFreeCommandBuffers(mDevice.mLogicalDevice, mDevice.mCommandPool, static_cast<uint32_t>(mCommandBuffers.shadowMap.size()), mCommandBuffers.shadowMap.data());
 	}
 
 	{
 		vkDestroyPipeline(mDevice.mLogicalDevice, mPipelines.debug, nullptr);
 		vkDestroyPipeline(mDevice.mLogicalDevice, mPipelines.offscreen, nullptr);
+		vkDestroyPipeline(mDevice.mLogicalDevice, mPipelines.shadowMap, nullptr);
 	}
 
 	{
 		vkDestroyPipelineLayout(mDevice.mLogicalDevice, mPipelineLayouts.debug, nullptr);
 		vkDestroyPipelineLayout(mDevice.mLogicalDevice, mPipelineLayouts.offscreen, nullptr);
+		vkDestroyPipelineLayout(mDevice.mLogicalDevice, mPipelineLayouts.shadowMap, nullptr);
 	}
 
 	{
 		vkDestroyRenderPass(mDevice.mLogicalDevice, mRenderPasses.debug, nullptr);
 		vkDestroyRenderPass(mDevice.mLogicalDevice, mOffscreenFrameBuffer.renderPass, nullptr);
+		vkDestroyRenderPass(mDevice.mLogicalDevice, mShadowMapFrameBuffer.renderPass, nullptr);
 	}
 
 	{
@@ -1884,10 +2299,13 @@ void Viewer::CleanupSwapChain() {
 		mOffscreenFrameBuffer.normal.CleanUp(&mDevice);
 		mOffscreenFrameBuffer.diffuse.CleanUp(&mDevice);
 		mOffscreenFrameBuffer.depth.CleanUp(&mDevice);
+
+		mShadowMapFrameBuffer.depth.CleanUp(&mDevice);
 	}
 
 	{
 		vkDestroySampler(mDevice.mLogicalDevice, mSampler, nullptr);
+		vkDestroySampler(mDevice.mLogicalDevice, mShadowMapFrameBuffer.depthSampler, nullptr);
 	}
 
 	for (size_t i = 0; i < m_swapChainImageViews.size(); ++i) {
@@ -1899,6 +2317,11 @@ void Viewer::CleanupSwapChain() {
 	for (size_t i = 0; i < m_uniformBuffers.size(); i++) {
 		vkDestroyBuffer(mDevice.mLogicalDevice, m_uniformBuffers[i], nullptr);
 		vkFreeMemory(mDevice.mLogicalDevice, m_uniformBuffersMemory[i], nullptr);
+	}
+
+	for (size_t i = 0; i < mUniformBuffers.shadowMapVS.size(); i++) {
+		vkDestroyBuffer(mDevice.mLogicalDevice, mUniformBuffers.shadowMapVS[i].mBuffer, nullptr);
+		vkFreeMemory(mDevice.mLogicalDevice, mUniformBuffers.shadowMapVS[i].mBufferMemory, nullptr);
 	}
 
 	vkDestroyDescriptorPool(mDevice.mLogicalDevice, m_descriptorPool, nullptr);
