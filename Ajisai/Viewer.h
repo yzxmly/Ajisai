@@ -4,6 +4,7 @@
 #include "Device.h"
 #include "Object.h"
 #include "Camera.h"
+#include "Light.h"
 
 #define AJISAI_NEW_IMPLEMENT
 
@@ -33,6 +34,15 @@ struct LightSpaceUniformBufferObject {
 	glm::mat4 matToWorld;
 	glm::mat4 matToLight;
 	glm::mat4 matToFrustum;
+	glm::vec4 lightPosition;
+	glm::vec4 lightDirection;
+};
+
+struct DeferredLightSpaceUniformBufferObject {
+	glm::mat4 matToLight;
+	glm::mat4 matToFrustum;
+	glm::vec4 lightPosition;
+	glm::vec4 lightDirection;
 };
 
 class Viewer
@@ -102,6 +112,36 @@ private:
 	} mOffscreenFrameBuffer;
 
 	struct {
+		int width, height;
+		std::vector<VkFramebuffer> frameBuffers;
+		Ajisai::Image position, normal, diffuse;
+		Ajisai::Image depth;
+		VkRenderPass renderPass;
+	} mDeferredFrameBuffer;
+
+	struct {
+		VkPipelineLayout offscreen;
+		VkPipelineLayout deferred;
+	} mDeferredPipelineLayouts;
+
+	struct {
+		VkPipeline offscreen;
+		VkPipeline deferred;
+	} mDeferredPipelines;
+
+	struct {
+		VkDescriptorSetLayout offscreenVSUniform;
+		VkDescriptorSetLayout offscreenFSSampler;
+		VkDescriptorSetLayout deferredFSSampler;
+	} mDeferredDescriptorSetLayouts;
+
+	struct {
+		std::vector<VkDescriptorSet> offscreenUniform;
+		std::vector<VkDescriptorSet> offscreenSampler;
+		std::vector<VkDescriptorSet> deferredSampler;
+	} mDeferredDescriptorSets;
+
+	struct {
 		int32_t width, height;
 		VkFramebuffer frameBuffer;
 		Ajisai::Image depth;
@@ -110,10 +150,12 @@ private:
 	} mShadowMapFrameBuffer;
 
 	struct {
+		VkDescriptorSetLayout debugUniform;
 		VkDescriptorSetLayout debugSampler;
 		VkDescriptorSetLayout shadowMapUniform;
 		VkDescriptorSetLayout offscreenUniform;
 		VkDescriptorSetLayout offscreenSampler;
+		VkDescriptorSetLayout deferredUniform;
 		VkDescriptorSetLayout deferredSampler;
 	} mDescriptorSetLayouts;
 
@@ -121,6 +163,7 @@ private:
 
 	// descriptorsets 
 	struct {
+		std::vector<VkDescriptorSet> debugUniform;
 		std::vector<VkDescriptorSet> debugSampler;
 		std::vector<VkDescriptorSet> shadowMapUniform;
 		std::vector<VkDescriptorSet> offscreenUniform;
@@ -156,6 +199,7 @@ private:
 	size_t m_currentFrame = 0;
 
 	Ajisai::Camera mCam;
+	Ajisai::Light mLight;
 
 	std::vector<VkBuffer> m_uniformBuffers;
 	std::vector<VkDeviceMemory> m_uniformBuffersMemory;
@@ -220,6 +264,8 @@ private:
 	void CreateShadowPipeline();
 	void CreateShadowDiscriptorSets();
 	void CreateShadowCommandBuffers();
+
+	void CreateDeferredFramebuffer();
 
 	VkShaderModule CreateShaderModule(const std::vector<char>& code);
 

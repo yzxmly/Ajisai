@@ -34,7 +34,7 @@ void main() {
 	vec3 colorSpecular = intensity * lightColor * vec3(texture(texSampler_specular, fragTexCoord));
 	
 	outPosition = vec4(fragPosition, 1.0);
-	outPosition = vec4(normal, 1.0);
+	//outPosition = vec4(normal, 1.0);
 	outNormal = vec4(fragNormal, 1.0);
 	outDiffuse = texture(texSampler_diffuse, fragTexCoord);
 

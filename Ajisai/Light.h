@@ -15,5 +15,3 @@ namespace Ajisai {
 		void GenerateMatToLight();
 	};
 }
-
-

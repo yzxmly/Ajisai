@@ -3,8 +3,10 @@
 
 layout(set = 0, binding = 0) uniform UniformBufferObject{
 	mat4 matToWorld;
-	mat4 matToCamera;
+	mat4 matToLight;
 	mat4 matToFrustum;
+	vec4 lightPosition;
+	vec4 lightDirection;
 } ubo;
 
 layout(location = 0) in vec3 inPosition;
@@ -16,5 +18,5 @@ layout(location = 4) in vec3 inBitangent;
 
 
 void main() {
-    gl_Position = ubo.matToFrustum * ubo.matToCamera * ubo.matToWorld * vec4(inPosition, 1.0);
+    gl_Position = ubo.matToFrustum * ubo.matToLight * ubo.matToWorld * vec4(inPosition, 1.0);
 }

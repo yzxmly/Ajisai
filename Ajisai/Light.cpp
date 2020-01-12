@@ -2,11 +2,11 @@
 
 namespace Ajisai {
 	void Light::GenerateMatToLight() {
-		glm::vec3 lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
+		glm::vec3 lookAt = mPosition + mDirection;
 		glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
 
 		mMatToLight = glm::lookAt(mPosition, lookAt, up);
-		mMatToFrustrum = glm::perspective(45.0f, 1.0f, 0.1f, 100.0f);
+		mMatToFrustrum = glm::perspective(glm::radians(80.0f), 1.0f, 1.0f, 40.0f);
 
 		mMatLight = mMatToFrustrum * mMatToLight;
 	}

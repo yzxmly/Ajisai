@@ -10,12 +10,10 @@ namespace Ajisai {
 		mCamPos = glm::vec3(13.0f, 13.0f, 13.0f);
 		mCamLookup = glm::vec3(0.0f, 8.0f, 0.0f);
 		mCamUp = glm::vec3(0.0f, 1.0f, 0.0f);
-
-		mMatToCam = glm::lookAt(mCamPos, mCamLookup, mCamUp);
-		mMatToFrustum = glm::perspective(mFov, mAspect, mNearClip, mFarClip);
 	}
 
 	void Camera::Update() {
-
+		mMatToCam = glm::lookAt(mCamPos, mCamLookup, mCamUp);
+		mMatToFrustum = glm::perspective(mFov, mAspect, mNearClip, mFarClip);
 	}
 }

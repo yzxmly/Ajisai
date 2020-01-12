@@ -36,6 +36,8 @@ void Viewer::FramebufferResizeCallback(GLFWwindow* window, int width, int height
 	app->m_windowResized = true;
 	app->mWidth = width;
 	app->mHeight = height;
+	app->mCam.mAspect = (float)width / (float)height;
+	app->mCam.Update();
 }
 
 void Viewer::InitVulkan() {
@@ -351,6 +353,13 @@ void Viewer::InitObjects() {
 
 	mModels.ground.BindDevice(mDevice);
 	mModels.ground.MakeGround(1.0f, 0.0f, 1.0f);
+
+	mCam.Initialize();
+
+	mLight.mPosition = glm::vec3(5.0f, 16.0f, 5.0f);
+	mLight.mDirection = glm::normalize(glm::vec3(-.8f, -1.0f, -.8f));
+
+	mLight.GenerateMatToLight();
 }
 
 QueueFamilyIndices Viewer::FindQueueFamilies(VkPhysicalDevice device) {
@@ -661,21 +670,38 @@ void Viewer::CreateDebugRenderPass() {
 void Viewer::CreateDebugDescriptorSetLayout() {
 #ifndef AJISAI_NEW_IMPLEMENT
 #else
-	VkDescriptorSetLayoutBinding sampler = {};
-	sampler.binding = 0;
-	sampler.descriptorCount = 1;
-	sampler.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	sampler.pImmutableSamplers = nullptr;
-	sampler.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-	std::array<VkDescriptorSetLayoutBinding, 1> bindings = { sampler };
+	std::array<VkDescriptorSetLayoutBinding, 4> bindings = {};
+	for (int i = 0; i < 4; i++) {
+		bindings[i].binding = i;
+		bindings[i].descriptorCount = 1;
+		bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		bindings[i].pImmutableSamplers = nullptr;
+		bindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	}
 
 	VkDescriptorSetLayoutCreateInfo samplerCreateInfo = {};
 	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	samplerCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
 	samplerCreateInfo.pBindings = bindings.data();
-
+	std::cout << "here" << std::endl;
 	if (vkCreateDescriptorSetLayout(mDevice.mLogicalDevice, &samplerCreateInfo, nullptr, &mDescriptorSetLayouts.debugSampler) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create descriptor set layout");
+	}
+
+	
+	VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+	uboLayoutBinding.binding = 0;
+	uboLayoutBinding.descriptorCount = 1;
+	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uboLayoutBinding.pImmutableSamplers = nullptr;
+	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	VkDescriptorSetLayoutCreateInfo uboCreateInfo = {};
+	uboCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	uboCreateInfo.bindingCount = 1;
+	uboCreateInfo.pBindings = &uboLayoutBinding;
+
+	if (vkCreateDescriptorSetLayout(mDevice.mLogicalDevice, &uboCreateInfo, nullptr, &mDescriptorSetLayouts.debugUniform) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create descriptor set layout");
 	}
 #endif
@@ -1145,7 +1171,7 @@ void Viewer::CreateDebugPipeline() {
 	dynamicStageCreateInfo.dynamicStateCount = 2;
 	dynamicStageCreateInfo.pDynamicStates = dynamicStages;
 
-	std::array<VkDescriptorSetLayout, 1> setLayouts = { mDescriptorSetLayouts.debugSampler };
+	std::array<VkDescriptorSetLayout, 2> setLayouts = { mDescriptorSetLayouts.debugUniform, mDescriptorSetLayouts.debugSampler };
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
@@ -1317,6 +1343,111 @@ void Viewer::CreateShadowFramebuffer() {
 	if (vkCreateSampler(mDevice.mLogicalDevice, &samplerCreateInfo, nullptr, &mShadowMapFrameBuffer.depthSampler) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create sampler");
 	}
+}
+
+void Viewer::CreateDeferredFramebuffer() {
+	mDeferredFrameBuffer.width = mWidth;
+	mDeferredFrameBuffer.height = mHeight;
+
+	// all image attachment 
+	mDeferredFrameBuffer.position.CreateImage(&mDevice, mWidth, mHeight, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	mDeferredFrameBuffer.position.CreateImageView(&mDevice, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
+
+	mDeferredFrameBuffer.normal.CreateImage(&mDevice, mWidth, mHeight, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	mDeferredFrameBuffer.normal.CreateImageView(&mDevice, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
+
+	mDeferredFrameBuffer.diffuse.CreateImage(&mDevice, mWidth, mHeight, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	mDeferredFrameBuffer.diffuse.CreateImageView(&mDevice, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+
+	// depth attachment
+	VkFormat depthFormat = FindDepthFormat();
+	mDeferredFrameBuffer.depth.CreateImage(&mDevice, mWidth, mHeight, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	mDeferredFrameBuffer.depth.CreateImageView(&mDevice, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+	std::array<VkAttachmentDescription, 5> attachmentDescs = {};
+	attachmentDescs[0].format = m_swapChainImageFormat;
+
+	for (uint32_t i = 0; i < 5; ++i) {
+		attachmentDescs[i].samples = VK_SAMPLE_COUNT_1_BIT;
+		attachmentDescs[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachmentDescs[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachmentDescs[i].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachmentDescs[i].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+		if (i == 4) {
+			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		}
+		else if (i == 0) {
+			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		}
+		else {
+			attachmentDescs[i].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			attachmentDescs[i].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		}
+	}
+
+	attachmentDescs[0].format = m_swapChainImageFormat;
+	attachmentDescs[1].format = mDeferredFrameBuffer.position.mFormat;
+	attachmentDescs[2].format = mDeferredFrameBuffer.normal.mFormat;
+	attachmentDescs[3].format = mDeferredFrameBuffer.diffuse.mFormat;
+	attachmentDescs[4].format = mDeferredFrameBuffer.depth.mFormat;
+
+	std::vector<VkAttachmentReference> firstColorReferences;
+	firstColorReferences.push_back({ 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+	firstColorReferences.push_back({ 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+	firstColorReferences.push_back({ 3, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+
+	VkAttachmentReference depthReference;
+	depthReference.attachment = 3;
+	depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	
+	VkAttachmentReference secondColorAttachmentRef = {};
+	secondColorAttachmentRef.attachment = 0;
+	secondColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	std::array<VkSubpassDescription, 2> subpasses = {};
+	subpasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpasses[0].pColorAttachments = firstColorReferences.data();
+	subpasses[0].colorAttachmentCount = static_cast<uint32_t>(firstColorReferences.size());
+	subpasses[0].pDepthStencilAttachment = &depthReference;
+
+	subpasses[1].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpasses[1].pColorAttachments = &secondColorAttachmentRef;
+	subpasses[1].colorAttachmentCount = 1;
+	subpasses[1].pDepthStencilAttachment = &depthReference;
+
+	std::array<VkSubpassDependency, 3> dependencies;
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = 1;
+	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	VkRenderPassCreateInfo renderPassCreateInfo = {};
+	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassCreateInfo.pAttachments = attachmentDescs.data();
+	renderPassCreateInfo.attachmentCount = static_cast<uint32_t>(attachmentDescs.size());
+	renderPassCreateInfo.subpassCount = 1;
+	renderPassCreateInfo.pSubpasses = &subpasses[0];
+	renderPassCreateInfo.dependencyCount = 2;
+	renderPassCreateInfo.pDependencies = dependencies.data();
+
+	if (vkCreateRenderPass(mDevice.mLogicalDevice, &renderPassCreateInfo, nullptr, &mOffscreenFrameBuffer.renderPass) != VK_SUCCESS) {
+		throw(std::runtime_error("failed to create offscreen renderPass"));
+	}
+
 }
 
 void Viewer::CreateOffscreenFramebuffer() {
@@ -1683,7 +1814,7 @@ void Viewer::CreateDebugCommandBuffers() {
 		vkCmdBindPipeline(mCommandBuffers.debug[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelines.debug);
 
 		VkBuffer vertexBuffers[] = {	mModels.debugScreen.mMeshes[0].mVertexBuffer.mBuffer };
-		std::array<VkDescriptorSet, 1> decriptorSets = { mDescriptorSets.debugSampler[0] };
+		std::array<VkDescriptorSet, 2> decriptorSets = { mDescriptorSets.debugUniform[0], mDescriptorSets.debugSampler[0] };
 		VkDeviceSize offsets[] = { 0 };
 		vkCmdBindVertexBuffers(mCommandBuffers.debug[i], 0, 1, vertexBuffers, offsets);
 		vkCmdBindIndexBuffer(mCommandBuffers.debug[i], mModels.debugScreen.mMeshes[0].mIndexBuffer.mBuffer, 0, VK_INDEX_TYPE_UINT16);
@@ -1734,7 +1865,7 @@ void Viewer::CreateSyncObjects() {
 void Viewer::CreateUniformBuffers() {
 #ifndef AJISAI_NEW_IMPLEMENT
 #else
-	mCam.Initialize();
+	mCam.Update();
 
 	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
@@ -1750,6 +1881,9 @@ void Viewer::CreateUniformBuffers() {
 	for (size_t i = 0; i < m_swapChainImages.size(); i++) {
 		mUniformBuffers.shadowMapVS[i].CreateBuffer(&mDevice, shadowMapVSBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	}
+
+	VkDeviceSize deferredLightFSBufferSize = sizeof(DeferredLightSpaceUniformBufferObject);
+	mUniformBuffers.deferredLightFS.CreateBuffer(&mDevice, deferredLightFSBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 #endif
 }
 
@@ -1778,14 +1912,26 @@ void Viewer::UpdateUniformBuffer(uint32_t imageIndex) {
 
 	LightSpaceUniformBufferObject lightUbo = {};
 	lightUbo.matToWorld = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f) / 10.0f, glm::vec3(0.0f, 1.0f, 0.0f));
-	lightUbo.matToLight = mCam.mMatToCam;
-	lightUbo.matToFrustum = mCam.mMatToFrustum;
+	lightUbo.matToLight = mLight.mMatToLight;
+	lightUbo.matToFrustum = mLight.mMatToFrustrum;
 	lightUbo.matToFrustum[1][1] *= -1;
 
 	void* lightdata;
 	vkMapMemory(mDevice.mLogicalDevice, mUniformBuffers.shadowMapVS[imageIndex].mBufferMemory, 0, sizeof(lightUbo), 0, &lightdata);
 	memcpy(lightdata, &lightUbo, sizeof(lightUbo));
 	vkUnmapMemory(mDevice.mLogicalDevice, mUniformBuffers.shadowMapVS[imageIndex].mBufferMemory);
+
+	DeferredLightSpaceUniformBufferObject deferredLightUbo = {};
+	deferredLightUbo.matToLight = mLight.mMatToLight;
+	deferredLightUbo.matToFrustum = mLight.mMatToFrustrum;
+	deferredLightUbo.lightPosition = glm::vec4(mLight.mPosition, 1.0f);
+	deferredLightUbo.lightDirection = glm::vec4(mLight.mDirection, 0.0f);
+	deferredLightUbo.matToFrustum[1][1] *= -1;
+
+	void* deferredLightData;
+	vkMapMemory(mDevice.mLogicalDevice, mUniformBuffers.deferredLightFS.mBufferMemory, 0, sizeof(deferredLightUbo), 0, &deferredLightData);
+	memcpy(deferredLightData, &deferredLightUbo, sizeof(deferredLightUbo));
+	vkUnmapMemory(mDevice.mLogicalDevice, mUniformBuffers.deferredLightFS.mBufferMemory);
 #endif // ! AJISAI_NEW_IMPLEMENT
 }
 
@@ -1796,16 +1942,16 @@ void Viewer::CreateDescriptorPool() {
 	std::array<VkDescriptorPoolSize, 2> poolSizes = {};
 
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = static_cast<uint32_t>(m_swapChainImages.size() * 2);
+	poolSizes[0].descriptorCount = static_cast<uint32_t>(m_swapChainImages.size() * 2 + 1);
 
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = static_cast<uint32_t>(mModels.nanoSuit.mMeshes.size() * 3 + 1);
+	poolSizes[1].descriptorCount = static_cast<uint32_t>(mModels.nanoSuit.mMeshes.size() * 3 + 4);
 
 	VkDescriptorPoolCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	createInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 	createInfo.pPoolSizes = poolSizes.data();
-	createInfo.maxSets = static_cast<uint32_t>(m_swapChainImages.size() * 2 + mModels.nanoSuit.mMeshes.size() + 1);
+	createInfo.maxSets = static_cast<uint32_t>(m_swapChainImages.size() * 2 + mModels.nanoSuit.mMeshes.size() + 2);
 
 	if (vkCreateDescriptorPool(mDevice.mLogicalDevice, &createInfo, nullptr, &m_descriptorPool) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create descriptor pool");
@@ -1917,11 +2063,39 @@ void Viewer::CreateShadowDiscriptorSets() {
 
 void Viewer::CreateDebugDescriptorSets() {
 #ifndef AJISAI_NEW_IMPLEMENT
-	
+
 #else
+	
+	std::vector<VkDescriptorSetLayout> uniformLayouts(1, mDescriptorSetLayouts.debugUniform);
+	VkDescriptorSetAllocateInfo uniformAllocInfo = {};
+	uniformAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	uniformAllocInfo.descriptorPool = m_descriptorPool;
+	uniformAllocInfo.descriptorSetCount = static_cast<uint32_t>(1);
+	uniformAllocInfo.pSetLayouts = uniformLayouts.data();
 
+	mDescriptorSets.debugUniform.resize(1);
+	if (vkAllocateDescriptorSets(mDevice.mLogicalDevice, &uniformAllocInfo, mDescriptorSets.debugUniform.data()) != VK_SUCCESS) {
+		throw std::runtime_error("failed to allocate descriptor sets");
+	}
+
+	VkDescriptorBufferInfo bufferInfo = {};
+	bufferInfo.buffer = mUniformBuffers.deferredLightFS.mBuffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = sizeof(DeferredLightSpaceUniformBufferObject);
+
+	VkWriteDescriptorSet descriptorWrite = {};
+	
+	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite.dstSet = mDescriptorSets.debugUniform[0];
+	descriptorWrite.dstBinding = 0;
+	descriptorWrite.dstArrayElement = 0;
+	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrite.descriptorCount = 1;
+	descriptorWrite.pBufferInfo = &bufferInfo;
+	std::cout << "a" << std::endl;
+	vkUpdateDescriptorSets(mDevice.mLogicalDevice, static_cast<uint32_t>(1), &descriptorWrite, 0, nullptr);
+	std::cout << "b" << std::endl;
 	std::vector<VkDescriptorSetLayout> samplerLayouts(1, mDescriptorSetLayouts.debugSampler);
-
 	VkDescriptorSetAllocateInfo samplerAllocInfo = {};
 	samplerAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	samplerAllocInfo.descriptorPool = m_descriptorPool;
@@ -1934,12 +2108,47 @@ void Viewer::CreateDebugDescriptorSets() {
 		throw std::runtime_error("failed to allocate descriptor sets");
 	}
 
+
+	// final buffer should contains position, normal, color from offscreen rendering
+	// and shadow map from shadow map rendering
+	std::array<VkDescriptorImageInfo, 4> imageInfos = {};
+	imageInfos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfos[0].imageView = mOffscreenFrameBuffer.position.mImageView;
+	imageInfos[0].sampler = mSampler;
+
+	imageInfos[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfos[1].imageView = mOffscreenFrameBuffer.normal.mImageView;
+	imageInfos[1].sampler = mSampler;
+
+	imageInfos[2].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfos[2].imageView = mOffscreenFrameBuffer.diffuse.mImageView;
+	imageInfos[2].sampler = mSampler;
+
+	imageInfos[3].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	imageInfos[3].imageView = mShadowMapFrameBuffer.depth.mImageView;
+	imageInfos[3].sampler = mShadowMapFrameBuffer.depthSampler;
+
+	std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
+
+	for (int i = 0; i < 4; i++) {
+		descriptorWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrites[i].dstSet = mDescriptorSets.debugSampler[0];
+		descriptorWrites[i].dstBinding = i;
+		descriptorWrites[i].dstArrayElement = 0;
+		descriptorWrites[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrites[i].descriptorCount = 1;
+
+		descriptorWrites[i].pImageInfo = &imageInfos[i];
+
+	}
+
+	/*
 	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-	//imageInfo.imageView = mOffscreenFrameBuffer.position.mImageView;
-	//imageInfo.sampler = mSampler;
-	imageInfo.imageView = mShadowMapFrameBuffer.depth.mImageView;
-	imageInfo.sampler = mShadowMapFrameBuffer.depthSampler;
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo.imageView = mOffscreenFrameBuffer.diffuse.mImageView;
+	imageInfo.sampler = mSampler;
+	//imageInfo.imageView = mShadowMapFrameBuffer.depth.mImageView;
+	//imageInfo.sampler = mShadowMapFrameBuffer.depthSampler;
 
 	VkWriteDescriptorSet descriptorWrite = {};
 	
@@ -1951,8 +2160,9 @@ void Viewer::CreateDebugDescriptorSets() {
 	descriptorWrite.descriptorCount = 1;
 
 	descriptorWrite.pImageInfo = &imageInfo;
+	*/
 
-	vkUpdateDescriptorSets(mDevice.mLogicalDevice, 1, &descriptorWrite, 0, nullptr);
+	vkUpdateDescriptorSets(mDevice.mLogicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 
 #endif
 }
