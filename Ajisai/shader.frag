@@ -19,19 +19,19 @@ void main() {
 	vec3 direction = normalize(vec3(-0.5f,-0.1f,-0.5f));
 	vec3 lightColor = vec3(1.0f,1.0f,1.0f);
 
-	vec3 normal = normalize(texture(texSampler_normal, fragTexCoord).rgb);
-	normal = normalize(matTBN * normal);
+	vec3 normLocal = normalize(texture(texSampler_normal, fragTexCoord).rgb * 2.0 - 1.0);
+	vec3 normWorld = normalize(matTBN * normLocal);
 
 	// diffuse color
-	float intensity = max(dot(normal, -direction), 0.0);
-	vec3 colorDiffuse = intensity * lightColor * vec3(texture(texSampler_diffuse, fragTexCoord));
+	//float intensity = max(dot(normal, -direction), 0.0);
+	//vec3 colorDiffuse = intensity * lightColor * vec3(texture(texSampler_diffuse, fragTexCoord));
 
 	// specular color
-	vec3 camDirection = normalize(camPos-fragPosition);
-	vec3 halfwayDirection = normalize(camDirection - direction);
+	//vec3 camDirection = normalize(camPos-fragPosition);
+	//vec3 halfwayDirection = normalize(camDirection - direction);
 
-	float specIntensity = pow(max(dot(halfwayDirection, normal), 0.0), 32);
-	vec3 colorSpecular = intensity * lightColor * vec3(texture(texSampler_specular, fragTexCoord));
+	//float specIntensity = pow(max(dot(halfwayDirection, normal), 0.0), 32);
+	//vec3 colorSpecular = intensity * lightColor * vec3(texture(texSampler_specular, fragTexCoord));
 	
 	outPosition = vec4(fragPosition, 1.0);
 	//outPosition = vec4(normal, 1.0);

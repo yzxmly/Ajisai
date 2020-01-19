@@ -357,7 +357,7 @@ void Viewer::InitObjects() {
 	mCam.Initialize();
 
 	mLight.mPosition = glm::vec3(5.0f, 16.0f, 5.0f);
-	mLight.mDirection = glm::normalize(glm::vec3(-.8f, -1.0f, -.8f));
+	mLight.mDirection = glm::normalize(glm::vec3(-.8f, -1.0f, -0.8f));
 
 	mLight.GenerateMatToLight();
 }

@@ -33,7 +33,7 @@ void main() {
 
 	vec3 T = normalize(mat3(ubo.matToWorld) * inTangent);
 	vec3 B = normalize(mat3(ubo.matToWorld) * inBitangent);
-	vec3 N = cross(T,B);
+	vec3 N = normalize(mat3(ubo.matToWorld) * inNormal);
 
 	matTBN = mat3(T,B,N);
 

@@ -5,7 +5,7 @@ namespace Ajisai {
 
 	void Model::LoadObject(std::string filePath) {
 		Assimp::Importer import;
-		const aiScene *scene = import.ReadFile(filePath, aiProcess_Triangulate | aiProcess_CalcTangentSpace | aiProcess_PreTransformVertices);
+		const aiScene *scene = import.ReadFile(filePath, aiProcess_Triangulate | aiProcess_CalcTangentSpace | aiProcess_PreTransformVertices | aiProcess_FlipUVs);
 
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
 			std::cout << "Assimp error: " << import.GetErrorString() << std::endl;
@@ -24,6 +24,7 @@ namespace Ajisai {
 
 			InitializeTexture(mat, aiTextureType_DIFFUSE, "texture_diffuse");
 			InitializeTexture(mat, aiTextureType_SPECULAR, "texture_specular");
+			InitializeTexture(mat, aiTextureType_HEIGHT, "texture_normal");
 		}
 
 		mTextures.resize(mTexturePath.size());
@@ -211,7 +212,7 @@ namespace Ajisai {
 
 			BindTexture(mat, mesh, aiTextureType_DIFFUSE, "diffuseTexture");
 			BindTexture(mat, mesh, aiTextureType_SPECULAR, "spectularTexture");
-			BindTexture(mat, mesh, aiTextureType_NORMALS, "normalTexture");
+			BindTexture(mat, mesh, aiTextureType_HEIGHT, "normalTexture");
 			//aiTextureType texType = aiTextureType_DIFFUSE;
 
 			//for (unsigned int i = 0; i < mat->GetTextureCount(texType); i++) {
