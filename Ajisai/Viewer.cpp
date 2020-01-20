@@ -28,6 +28,7 @@ void Viewer::InitWindow() {
 	mWindow = glfwCreateWindow(mWidth, mHeight, "Ajisai", nullptr, nullptr);
 	glfwSetWindowUserPointer(mWindow, this);
 	glfwSetFramebufferSizeCallback(mWindow, FramebufferResizeCallback);
+	glfwSetKeyCallback(mWindow, KeyCallback);
 #endif
 }
 
@@ -38,6 +39,24 @@ void Viewer::FramebufferResizeCallback(GLFWwindow* window, int width, int height
 	app->mHeight = height;
 	app->mCam.mAspect = (float)width / (float)height;
 	app->mCam.Update();
+}
+
+void Viewer::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	auto app = reinterpret_cast<Viewer*>(glfwGetWindowUserPointer(window));
+
+	if (action == GLFW_PRESS) {
+		
+		if (key == GLFW_KEY_UP) {
+			app->mRoughness += 0.05f;
+			std::cout << "Surface roughness: " << app->mRoughness << std::endl;
+		}
+		if (key == GLFW_KEY_DOWN) {
+			if (app->mRoughness > 0.11f) {
+				app->mRoughness -= 0.1f;
+			}
+			std::cout << "Surface roughness: " << app->mRoughness << std::endl;
+		}
+	}
 }
 
 void Viewer::InitVulkan() {
@@ -1928,7 +1947,7 @@ void Viewer::UpdateUniformBuffer(uint32_t imageIndex) {
 	deferredLightUbo.lightPosition = glm::vec4(mLight.mPosition, 1.0f);
 	deferredLightUbo.lightDirection = glm::vec4(mLight.mDirection, 0.0f);
 	deferredLightUbo.matToFrustum[1][1] *= -1;
-	deferredLightUbo.roughness = glm::vec4(0.1f, 0.0f, 0.0f, 0.0f);
+	deferredLightUbo.roughness = glm::vec4(mRoughness, 0.0f, 0.0f, 0.0f);
 
 	void* deferredLightData;
 	vkMapMemory(mDevice.mLogicalDevice, mUniformBuffers.deferredLightFS.mBufferMemory, 0, sizeof(deferredLightUbo), 0, &deferredLightData);

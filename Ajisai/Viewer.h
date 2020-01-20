@@ -58,7 +58,7 @@ public:
 	}
 private:
 	// GLFW objects
-	int mWidth = 800, mHeight = 600;
+	int mWidth = 1280, mHeight = 720;
 	GLFWwindow* mWindow;
 	bool m_windowResized = false;
 
@@ -83,6 +83,7 @@ private:
 	// cubeMap
 
 	Ajisai::CubeMap mCubeMap;
+	float mRoughness = 0.2f;
 
 	// Pipeline Object
 	VkDescriptorPool m_descriptorPool;
@@ -213,6 +214,7 @@ private:
 	// Initialize GLFW
 	void InitWindow();
 	static void FramebufferResizeCallback(GLFWwindow* window, int width, int height);
+	static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 	// Initialize Vulkan and recreate
 	void InitVulkan();

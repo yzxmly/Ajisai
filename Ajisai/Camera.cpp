@@ -3,7 +3,7 @@
 namespace Ajisai {
 	void Camera::Initialize() {
 		mFov = glm::radians(45.0f);
-		mAspect = 800.0f / 600.0f;
+		mAspect = 1280.0f / 720.0f;
 		mNearClip = 0.1f;
 		mFarClip = 100.0f;
 
