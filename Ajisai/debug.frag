@@ -2,17 +2,20 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 #define PI 3.1415926535897932384626433832795
+#define SAMPLES 128
 
 layout(set = 1, binding = 0) uniform sampler2D positionSampler;
 layout(set = 1, binding = 1) uniform sampler2D normalSampler;
 layout(set = 1, binding = 2) uniform sampler2D diffuseSampler;
 layout(set = 1, binding = 3) uniform sampler2D shadowMapSampler;
+layout(set = 1, binding = 4) uniform samplerCube cubeMapSampler;
 
 layout(set = 0, binding = 0) uniform UniformBufferObject{
 	mat4 matToLight;
 	mat4 matToFrustum;
 	vec4 lightPosition;
 	vec4 lightDirection;
+	vec4 roughness;
 } ubo;
  
 layout(location = 0) in vec2 fragTexCoord;
@@ -68,7 +71,7 @@ float GSmith(float roughness, float NoV, float NoL){
 vec3 SpecularIBL(vec3 specular, float roughness, vec3 norm, vec3 toCam){
 	vec3 light = vec3(0.0f);
 
-	const int numSamples = 16;
+	const int numSamples = SAMPLES;
 	for(int i = 0 ; i < numSamples ; i++){
 		vec2 xi = Hammersley(i, numSamples);
 		vec3 microNorm = ImportanceSampleGGX(xi, roughness, norm);
@@ -80,7 +83,7 @@ vec3 SpecularIBL(vec3 specular, float roughness, vec3 norm, vec3 toCam){
 		float VoH = clamp(dot(toCam, microNorm), 0.0f, 1.0f);
 
 		if(NoL > 0){
-			vec3 sampleColor = vec3(1.0f);
+			vec3 sampleColor = texture(cubeMapSampler,toLight).rgb;
 
 			float G = GSmith(roughness, NoV, NoL );
 			float Fc = pow(1-VoH, 5);
@@ -89,7 +92,7 @@ vec3 SpecularIBL(vec3 specular, float roughness, vec3 norm, vec3 toCam){
 			light += sampleColor * F * G * VoH / (NoH * NoV);
 		}
 	}
-	return light;
+	return light / numSamples;
 }
 
 void main() {
@@ -103,36 +106,40 @@ void main() {
 	vec3 lightPosition = vec3(ubo.lightPosition);
 
 	vec3 toCam = normalize(camPosition - objPosition);
-	vec3 toLight = normalize(lightPosition - objPosition);
-	vec3 h = normalize(toCam + toLight);
+	vec3 specular = vec3(1.0f,1.0f,1.0f);
+	vec3 color = SpecularIBL(specular, ubo.roughness.r, objNorm, toCam);
 
-	float NoV = clamp(dot(objNorm, toCam) , 0.0f ,1.0f);
-	float NoL = clamp(dot(objNorm, toLight), 0.0f, 1.0f);
-	float NoH = clamp(dot(objNorm, h), 0.0f, 1.0f);
-	float VoH = clamp(dot(toCam, h), 0.0f, 1.0f);
 
-	vec3 color = vec3(0.0f);
-	if( NoL > 0){
-		float roughness = 0.4f;
-		float alpha = roughness * roughness;
-		float k = (roughness + 1) * (roughness + 1) / 8.0f;
+	//vec3 toLight = normalize(lightPosition - objPosition);
+	//vec3 h = normalize(toCam + toLight);
 
-		float d = alpha * alpha / PI / pow((NoH * NoH * (alpha * alpha -1) + 1),2);
+	//float NoV = clamp(dot(objNorm, toCam) , 0.0f ,1.0f);
+	//float NoL = clamp(dot(objNorm, toLight), 0.0f, 1.0f);
+	//float NoH = clamp(dot(objNorm, h), 0.0f, 1.0f);
+	//float VoH = clamp(dot(toCam, h), 0.0f, 1.0f);
 
-		float gv = NoV / (NoV * (1 - k) + k);
-		float gl = NoL / (NoL * (1 - k) + k);
-		float G = gv * gl;
-
-		float Fc = pow(1 - VoH, 5);
-
-		vec3 F = (1 - Fc) * vec3(5.0f , 5.0f , 5.0f) + Fc;
-
-		color = d * F * G / (4.0f * NoV);
-
-	}
-	else{
-		color = vec3(0.0f);
-	}
+	//vec3 color = vec3(0.0f);
+	//if( NoL > 0){
+	//	float roughness = 0.5f;
+	//	float alpha = roughness * roughness;
+//		float k = (roughness + 1) * (roughness + 1) / 8.0f;
+//
+//		float d = alpha * alpha / PI / pow((NoH * NoH * (alpha * alpha -1) + 1),2);
+//
+//		float gv = NoV / (NoV * (1 - k) + k);
+//		float gl = NoL / (NoL * (1 - k) + k);
+//		float G = gv * gl;
+//
+//		float Fc = pow(1 - VoH, 5);
+//
+//		vec3 F = (1 - Fc) * vec3(5.0f , 5.0f , 5.0f) + Fc;
+//
+//		color = d * F * G / (4.0f * NoV);
+//
+//	}
+//	else{
+//		color = vec3(0.0f);
+//	}
 	
 
 	//vec4 posWorld = vec4(texture(positionSampler, fragTexCoord).rgb , 1.0f);
@@ -151,5 +158,6 @@ void main() {
 
 	//outColor = vec4(shadowAtten * diffuseAtten * vec3(1.0f,1.0f,1.0f), 1.0f);
 	//outColor = vec4(texture(normalSampler,fragTexCoord).rgb, 1.0f);
-	outColor = vec4(color, 1.0f);
+	//outColor = vec4(color, 1.0f);
+	outColor = vec4(color,1.0f);
 }

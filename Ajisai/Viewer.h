@@ -5,6 +5,7 @@
 #include "Object.h"
 #include "Camera.h"
 #include "Light.h"
+#include "CubeMap.h"
 
 #define AJISAI_NEW_IMPLEMENT
 
@@ -43,6 +44,7 @@ struct DeferredLightSpaceUniformBufferObject {
 	glm::mat4 matToFrustum;
 	glm::vec4 lightPosition;
 	glm::vec4 lightDirection;
+	glm::vec4 roughness;
 };
 
 class Viewer
@@ -77,6 +79,10 @@ private:
 		Ajisai::Model ground;
 		Ajisai::Model nanoSuit;
 	} mModels;
+
+	// cubeMap
+
+	Ajisai::CubeMap mCubeMap;
 
 	// Pipeline Object
 	VkDescriptorPool m_descriptorPool;

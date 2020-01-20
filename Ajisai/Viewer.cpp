@@ -360,6 +360,8 @@ void Viewer::InitObjects() {
 	mLight.mDirection = glm::normalize(glm::vec3(-.8f, -1.0f, -0.8f));
 
 	mLight.GenerateMatToLight();
+
+	mCubeMap.CreateCubeMap(&mDevice, "aaa");
 }
 
 QueueFamilyIndices Viewer::FindQueueFamilies(VkPhysicalDevice device) {
@@ -670,8 +672,8 @@ void Viewer::CreateDebugRenderPass() {
 void Viewer::CreateDebugDescriptorSetLayout() {
 #ifndef AJISAI_NEW_IMPLEMENT
 #else
-	std::array<VkDescriptorSetLayoutBinding, 4> bindings = {};
-	for (int i = 0; i < 4; i++) {
+	std::array<VkDescriptorSetLayoutBinding, 5> bindings = {};
+	for (int i = 0; i < 5; i++) {
 		bindings[i].binding = i;
 		bindings[i].descriptorCount = 1;
 		bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -683,7 +685,6 @@ void Viewer::CreateDebugDescriptorSetLayout() {
 	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	samplerCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
 	samplerCreateInfo.pBindings = bindings.data();
-	std::cout << "here" << std::endl;
 	if (vkCreateDescriptorSetLayout(mDevice.mLogicalDevice, &samplerCreateInfo, nullptr, &mDescriptorSetLayouts.debugSampler) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create descriptor set layout");
 	}
@@ -1927,6 +1928,7 @@ void Viewer::UpdateUniformBuffer(uint32_t imageIndex) {
 	deferredLightUbo.lightPosition = glm::vec4(mLight.mPosition, 1.0f);
 	deferredLightUbo.lightDirection = glm::vec4(mLight.mDirection, 0.0f);
 	deferredLightUbo.matToFrustum[1][1] *= -1;
+	deferredLightUbo.roughness = glm::vec4(0.1f, 0.0f, 0.0f, 0.0f);
 
 	void* deferredLightData;
 	vkMapMemory(mDevice.mLogicalDevice, mUniformBuffers.deferredLightFS.mBufferMemory, 0, sizeof(deferredLightUbo), 0, &deferredLightData);
@@ -1945,7 +1947,7 @@ void Viewer::CreateDescriptorPool() {
 	poolSizes[0].descriptorCount = static_cast<uint32_t>(m_swapChainImages.size() * 2 + 1);
 
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = static_cast<uint32_t>(mModels.nanoSuit.mMeshes.size() * 3 + 4);
+	poolSizes[1].descriptorCount = static_cast<uint32_t>(mModels.nanoSuit.mMeshes.size() * 3 + 5);
 
 	VkDescriptorPoolCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -2092,9 +2094,7 @@ void Viewer::CreateDebugDescriptorSets() {
 	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	descriptorWrite.descriptorCount = 1;
 	descriptorWrite.pBufferInfo = &bufferInfo;
-	std::cout << "a" << std::endl;
 	vkUpdateDescriptorSets(mDevice.mLogicalDevice, static_cast<uint32_t>(1), &descriptorWrite, 0, nullptr);
-	std::cout << "b" << std::endl;
 	std::vector<VkDescriptorSetLayout> samplerLayouts(1, mDescriptorSetLayouts.debugSampler);
 	VkDescriptorSetAllocateInfo samplerAllocInfo = {};
 	samplerAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -2111,7 +2111,7 @@ void Viewer::CreateDebugDescriptorSets() {
 
 	// final buffer should contains position, normal, color from offscreen rendering
 	// and shadow map from shadow map rendering
-	std::array<VkDescriptorImageInfo, 4> imageInfos = {};
+	std::array<VkDescriptorImageInfo, 5> imageInfos = {};
 	imageInfos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	imageInfos[0].imageView = mOffscreenFrameBuffer.position.mImageView;
 	imageInfos[0].sampler = mSampler;
@@ -2128,9 +2128,13 @@ void Viewer::CreateDebugDescriptorSets() {
 	imageInfos[3].imageView = mShadowMapFrameBuffer.depth.mImageView;
 	imageInfos[3].sampler = mShadowMapFrameBuffer.depthSampler;
 
-	std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
+	imageInfos[4].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfos[4].imageView = mCubeMap.mImageView;
+	imageInfos[4].sampler = mCubeMap.mSampler;
 
-	for (int i = 0; i < 4; i++) {
+	std::array<VkWriteDescriptorSet, 5> descriptorWrites = {};
+
+	for (int i = 0; i < 5; i++) {
 		descriptorWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		descriptorWrites[i].dstSet = mDescriptorSets.debugSampler[0];
 		descriptorWrites[i].dstBinding = i;
@@ -2450,10 +2454,14 @@ void Viewer::CleanUp() {
 	}
 
 	{
+		mCubeMap.CleanUp(&mDevice);
+	}
+	{
 		vkDestroyDescriptorSetLayout(mDevice.mLogicalDevice, mDescriptorSetLayouts.debugSampler, nullptr);
 		vkDestroyDescriptorSetLayout(mDevice.mLogicalDevice, mDescriptorSetLayouts.offscreenUniform, nullptr);
 		vkDestroyDescriptorSetLayout(mDevice.mLogicalDevice, mDescriptorSetLayouts.offscreenSampler, nullptr);
 		vkDestroyDescriptorSetLayout(mDevice.mLogicalDevice, mDescriptorSetLayouts.shadowMapUniform, nullptr);
+		vkDestroyDescriptorSetLayout(mDevice.mLogicalDevice, mDescriptorSetLayouts.debugUniform, nullptr);
 	}
 
 	vkDestroySurfaceKHR(mDevice.mInstance, m_surface, nullptr);
@@ -2461,7 +2469,6 @@ void Viewer::CleanUp() {
 		mDevice.DestroyDebugUtilsMessengerEXT();
 	}
 	mDevice.CleanUp();
-	std::cout << "Here" << std::endl;
 	glfwDestroyWindow(mWindow);
 	glfwTerminate();
 #endif
@@ -2533,6 +2540,8 @@ void Viewer::CleanupSwapChain() {
 		vkDestroyBuffer(mDevice.mLogicalDevice, mUniformBuffers.shadowMapVS[i].mBuffer, nullptr);
 		vkFreeMemory(mDevice.mLogicalDevice, mUniformBuffers.shadowMapVS[i].mBufferMemory, nullptr);
 	}
+
+	mUniformBuffers.deferredLightFS.CleanUp(&mDevice);
 
 	vkDestroyDescriptorPool(mDevice.mLogicalDevice, m_descriptorPool, nullptr);
 #endif
