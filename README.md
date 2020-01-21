@@ -11,4 +11,4 @@ To compile this demo, the following third party libraries are required
 ## Implemented rendering algorithm
 * Real-time GGX shading ([reference](https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf)).
 * Real-time polygonal-light shading with linearly transformed cosines ([reference](https://eheitzresearch.wordpress.com/415-2/)).
-
+* This vulkan renderer supports deferred shading, shadow mapping and normal mapping.
