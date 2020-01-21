@@ -28,7 +28,7 @@ void main() {
 
 	fragPosition = vec3(ubo.matToWorld * vec4(inPosition, 1.0));
 	
-	fragNormal = normalize(mat3(transpose(inverse(ubo.matToWorld))) * inNormal);
+	fragNormal = mat3(transpose(inverse(ubo.matToWorld))) * inNormal;
 	//fragNormal = normalize(mat3(ubo.matToWorld) * inNormal);
 
 	vec3 T = normalize(mat3(ubo.matToWorld) * inTangent);

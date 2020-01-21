@@ -1,4 +1,5 @@
 #include "Viewer.h"
+#include "LTC.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -371,16 +372,106 @@ void Viewer::InitObjects() {
 	mModels.debugScreen.MakeScreen();
 
 	mModels.ground.BindDevice(mDevice);
-	mModels.ground.MakeGround(1.0f, 0.0f, 1.0f);
+	mModels.ground.MakeGround(0.9f, 0.0f, 5.0f);
 
 	mCam.Initialize();
 
-	mLight.mPosition = glm::vec3(5.0f, 16.0f, 5.0f);
+	mLight.mPosition = glm::vec3(3.5f, 8.0f, 3.5f);
 	mLight.mDirection = glm::normalize(glm::vec3(-.8f, -1.0f, -0.8f));
 
 	mLight.GenerateMatToLight();
 
 	mCubeMap.CreateCubeMap(&mDevice, "aaa");
+
+	// initialize LTC objects
+	{
+		mLTCTextures.width = 64;
+		mLTCTextures.height = 64;
+		VkDeviceSize imageSize = 64 * 64 * 4 * 4;
+
+		float mag[16384] = {};
+		for (int i = 0; i < 4096; i++) {
+			mag[4 * i] = g_ltc_mag[i];
+			mag[4 * i + 1] = g_ltc_mag[i];
+			mag[4 * i + 2] = g_ltc_mag[i];
+			mag[4 * i + 3] = g_ltc_mag[i];
+		}
+
+		Ajisai::Buffer stagingBuffer;
+		stagingBuffer.CreateBuffer(&mDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+		void *data;
+		vkMapMemory(mDevice.mLogicalDevice, stagingBuffer.mBufferMemory, 0, imageSize, 0, &data);
+		memcpy(data, g_ltc_mat, static_cast<size_t>(imageSize));
+		vkUnmapMemory(mDevice.mLogicalDevice, stagingBuffer.mBufferMemory);
+
+		mLTCTextures.LTCMAT.CreateImage(&mDevice, 64, 64, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		mDevice.CmdTransitionImageLayout(mLTCTextures.LTCMAT.mImage, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		mDevice.CmdCopyBufferToImage(stagingBuffer.mBuffer, mLTCTextures.LTCMAT.mImage, 64, 64);
+		mDevice.CmdTransitionImageLayout(mLTCTextures.LTCMAT.mImage, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		stagingBuffer.CleanUp(&mDevice);
+
+		mLTCTextures.LTCMAT.CreateImageView(&mDevice, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
+		VkSamplerCreateInfo createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		createInfo.magFilter = VK_FILTER_LINEAR;
+		createInfo.minFilter = VK_FILTER_LINEAR;
+		createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		createInfo.anisotropyEnable = VK_TRUE;
+		createInfo.maxAnisotropy = 16;
+		createInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		createInfo.unnormalizedCoordinates = VK_FALSE;
+		createInfo.compareEnable = VK_FALSE;
+		createInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+		createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		createInfo.mipLodBias = 0.0f;
+		createInfo.minLod = 0.0f;
+		createInfo.maxLod = 0.0f;
+
+		if (vkCreateSampler(mDevice.mLogicalDevice, &createInfo, nullptr, &mLTCTextures.LTCMATSampler) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create sampler");
+		}
+
+
+		stagingBuffer.CreateBuffer(&mDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+
+		vkMapMemory(mDevice.mLogicalDevice, stagingBuffer.mBufferMemory, 0, imageSize, 0, &data);
+		memcpy(data, mag, static_cast<size_t>(imageSize));
+		vkUnmapMemory(mDevice.mLogicalDevice, stagingBuffer.mBufferMemory);
+
+		mLTCTextures.LTCMAG.CreateImage(&mDevice, 64, 64, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		mDevice.CmdTransitionImageLayout(mLTCTextures.LTCMAG.mImage, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		mDevice.CmdCopyBufferToImage(stagingBuffer.mBuffer, mLTCTextures.LTCMAG.mImage, 64, 64);
+		mDevice.CmdTransitionImageLayout(mLTCTextures.LTCMAG.mImage, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		stagingBuffer.CleanUp(&mDevice);
+
+		mLTCTextures.LTCMAG.CreateImageView(&mDevice, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
+		
+		createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		createInfo.magFilter = VK_FILTER_LINEAR;
+		createInfo.minFilter = VK_FILTER_LINEAR;
+		createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		createInfo.anisotropyEnable = VK_TRUE;
+		createInfo.maxAnisotropy = 16;
+		createInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+		createInfo.unnormalizedCoordinates = VK_FALSE;
+		createInfo.compareEnable = VK_FALSE;
+		createInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+		createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		createInfo.mipLodBias = 0.0f;
+		createInfo.minLod = 0.0f;
+		createInfo.maxLod = 0.0f;
+
+		if (vkCreateSampler(mDevice.mLogicalDevice, &createInfo, nullptr, &mLTCTextures.LTCMAGSampler) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create sampler");
+		}
+	
+	}
 }
 
 QueueFamilyIndices Viewer::FindQueueFamilies(VkPhysicalDevice device) {
@@ -691,8 +782,8 @@ void Viewer::CreateDebugRenderPass() {
 void Viewer::CreateDebugDescriptorSetLayout() {
 #ifndef AJISAI_NEW_IMPLEMENT
 #else
-	std::array<VkDescriptorSetLayoutBinding, 5> bindings = {};
-	for (int i = 0; i < 5; i++) {
+	std::array<VkDescriptorSetLayoutBinding, 7> bindings = {};
+	for (int i = 0; i < 7; i++) {
 		bindings[i].binding = i;
 		bindings[i].descriptorCount = 1;
 		bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1772,6 +1863,7 @@ void Viewer::CreateOffscreenCommandBuffers() {
 		vkCmdBindPipeline(mCommandBuffers.offscreen[i], VK_PIPELINE_BIND_POINT_GRAPHICS, mPipelines.offscreen);
 
 		for (unsigned int j = 0; j < mModels.nanoSuit.mMeshes.size(); j++) {
+			
 			VkBuffer vertexBuffers[] = { mModels.nanoSuit.mMeshes[j].mVertexBuffer.mBuffer };
 			std::array<VkDescriptorSet, 2> decriptorSets = { mDescriptorSets.offscreenUniform[i], mDescriptorSets.offscreenSampler[j] };
 			VkDeviceSize offsets[] = { 0 };
@@ -1917,12 +2009,12 @@ void Viewer::UpdateUniformBuffer(uint32_t imageIndex) {
 	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 	//time = time + 0.001f;
 	UniformBufferObject ubo = {};
-	ubo.mat_toWorld = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f)/10.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+	ubo.mat_toWorld = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f)/4.0f, glm::vec3(0.0f, 1.0f, 0.0f));
 	//ubo.mat_toWorld = glm::mat4(1.0f);
 	ubo.mat_toCamera = mCam.mMatToCam;
 	//ubo.mat_toCamera = glm::lookAt(glm::vec3(4.0f, 4.0f, 4.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	ubo.mat_toFrustum = mCam.mMatToFrustum;
-	ubo.mat_toFrustum[1][1] *= -1;
+	ubo.mat_toFrustum[1][1] *= -1.0f;
 	ubo.camPosition = glm::vec4(mCam.mCamPos, 1.0f);
 
 	void* data;
@@ -1932,6 +2024,7 @@ void Viewer::UpdateUniformBuffer(uint32_t imageIndex) {
 
 	LightSpaceUniformBufferObject lightUbo = {};
 	lightUbo.matToWorld = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f) / 10.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+	//lightUbo.matToWorld = glm::mat4(1.0f);
 	lightUbo.matToLight = mLight.mMatToLight;
 	lightUbo.matToFrustum = mLight.mMatToFrustrum;
 	lightUbo.matToFrustum[1][1] *= -1;
@@ -1946,9 +2039,12 @@ void Viewer::UpdateUniformBuffer(uint32_t imageIndex) {
 	deferredLightUbo.matToFrustum = mLight.mMatToFrustrum;
 	deferredLightUbo.lightPosition = glm::vec4(mLight.mPosition, 1.0f);
 	deferredLightUbo.lightDirection = glm::vec4(mLight.mDirection, 0.0f);
-	deferredLightUbo.matToFrustum[1][1] *= -1;
+	deferredLightUbo.matToFrustum[1][1] *= -1.0f;
 	deferredLightUbo.roughness = glm::vec4(mRoughness, 0.0f, 0.0f, 0.0f);
-
+	deferredLightUbo.lightQuadL0 = glm::vec4(mLight.mPosition, 1.0f);
+	deferredLightUbo.lightQuadL1 = glm::vec4(mLight.mPosition, 1.0f) + glm::vec4(3.0f, 0.0f, -3.0f, 0.0f);
+	deferredLightUbo.lightQuadL2 = glm::vec4(mLight.mPosition, 1.0f) + glm::vec4(3.0f, 5.0f, -3.0f, 0.0f);
+	deferredLightUbo.lightQuadL3 = glm::vec4(mLight.mPosition, 1.0f) + glm::vec4(0.0f, 5.0f, 0.0f, 0.0f);
 	void* deferredLightData;
 	vkMapMemory(mDevice.mLogicalDevice, mUniformBuffers.deferredLightFS.mBufferMemory, 0, sizeof(deferredLightUbo), 0, &deferredLightData);
 	memcpy(deferredLightData, &deferredLightUbo, sizeof(deferredLightUbo));
@@ -1966,7 +2062,7 @@ void Viewer::CreateDescriptorPool() {
 	poolSizes[0].descriptorCount = static_cast<uint32_t>(m_swapChainImages.size() * 2 + 1);
 
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = static_cast<uint32_t>(mModels.nanoSuit.mMeshes.size() * 3 + 5);
+	poolSizes[1].descriptorCount = static_cast<uint32_t>(mModels.nanoSuit.mMeshes.size() * 3 + 7);
 
 	VkDescriptorPoolCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -2130,7 +2226,7 @@ void Viewer::CreateDebugDescriptorSets() {
 
 	// final buffer should contains position, normal, color from offscreen rendering
 	// and shadow map from shadow map rendering
-	std::array<VkDescriptorImageInfo, 5> imageInfos = {};
+	std::array<VkDescriptorImageInfo, 7> imageInfos = {};
 	imageInfos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	imageInfos[0].imageView = mOffscreenFrameBuffer.position.mImageView;
 	imageInfos[0].sampler = mSampler;
@@ -2151,9 +2247,17 @@ void Viewer::CreateDebugDescriptorSets() {
 	imageInfos[4].imageView = mCubeMap.mImageView;
 	imageInfos[4].sampler = mCubeMap.mSampler;
 
-	std::array<VkWriteDescriptorSet, 5> descriptorWrites = {};
+	imageInfos[5].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfos[5].imageView = mLTCTextures.LTCMAT.mImageView;
+	imageInfos[5].sampler = mLTCTextures.LTCMATSampler;
 
-	for (int i = 0; i < 5; i++) {
+	imageInfos[6].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfos[6].imageView = mLTCTextures.LTCMAG.mImageView;
+	imageInfos[6].sampler = mLTCTextures.LTCMAGSampler;
+
+	std::array<VkWriteDescriptorSet, 7> descriptorWrites = {};
+
+	for (int i = 0; i < 7; i++) {
 		descriptorWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		descriptorWrites[i].dstSet = mDescriptorSets.debugSampler[0];
 		descriptorWrites[i].dstBinding = i;
@@ -2470,6 +2574,11 @@ void Viewer::CleanUp() {
 		mModels.nanoSuit.CleanUp();
 		mModels.debugScreen.CleanUp();
 		mModels.ground.CleanUp();
+
+		mLTCTextures.LTCMAG.CleanUp(&mDevice);
+		mLTCTextures.LTCMAT.CleanUp(&mDevice);
+		vkDestroySampler(mDevice.mLogicalDevice, mLTCTextures.LTCMAGSampler, nullptr);
+		vkDestroySampler(mDevice.mLogicalDevice, mLTCTextures.LTCMATSampler, nullptr);
 	}
 
 	{

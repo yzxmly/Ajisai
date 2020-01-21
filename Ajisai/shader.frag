@@ -35,7 +35,7 @@ void main() {
 	
 	outPosition = vec4(fragPosition, 1.0);
 	//outPosition = vec4(normal, 1.0);
-	outNormal = vec4(fragNormal, 1.0);
+	outNormal = vec4(normWorld, 1.0);
 	outDiffuse = texture(texSampler_diffuse, fragTexCoord);
 
 }

@@ -107,11 +107,11 @@ namespace Ajisai {
 		mMeshes[0].mVertices[3].texCoord = glm::vec2(1.0f, 0.0f);
 
 		mMeshes[0].mIndices[0] = 0;
-		mMeshes[0].mIndices[1] = 2;
-		mMeshes[0].mIndices[2] = 1;
+		mMeshes[0].mIndices[1] = 1;
+		mMeshes[0].mIndices[2] = 2;
 		mMeshes[0].mIndices[3] = 1;
-		mMeshes[0].mIndices[4] = 2;
-		mMeshes[0].mIndices[5] = 3;
+		mMeshes[0].mIndices[4] = 3;
+		mMeshes[0].mIndices[5] = 2;
 
 		mMeshes[0].CreateBuffers(mDevice);
 	}

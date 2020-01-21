@@ -5,7 +5,7 @@ namespace Ajisai {
 		mFov = glm::radians(45.0f);
 		mAspect = 1280.0f / 720.0f;
 		mNearClip = 0.1f;
-		mFarClip = 100.0f;
+		mFarClip = 200.0f;
 
 		mCamPos = glm::vec3(15.0f, 15.0f, 15.0f);
 		mCamLookup = glm::vec3(0.0f, 8.0f, 0.0f);

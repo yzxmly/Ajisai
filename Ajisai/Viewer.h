@@ -45,6 +45,11 @@ struct DeferredLightSpaceUniformBufferObject {
 	glm::vec4 lightPosition;
 	glm::vec4 lightDirection;
 	glm::vec4 roughness;
+	glm::vec4 lightQuadL0;
+	glm::vec4 lightQuadL1;
+	glm::vec4 lightQuadL2;
+	glm::vec4 lightQuadL3;
+
 };
 
 class Viewer
@@ -83,7 +88,7 @@ private:
 	// cubeMap
 
 	Ajisai::CubeMap mCubeMap;
-	float mRoughness = 0.2f;
+	float mRoughness = 0.5f;
 
 	// Pipeline Object
 	VkDescriptorPool m_descriptorPool;
@@ -125,6 +130,12 @@ private:
 		Ajisai::Image depth;
 		VkRenderPass renderPass;
 	} mDeferredFrameBuffer;
+
+	struct {
+		int width, height;
+		Ajisai::Image LTCMAT, LTCMAG;
+		VkSampler LTCMATSampler, LTCMAGSampler;
+	} mLTCTextures;
 
 	struct {
 		VkPipelineLayout offscreen;
