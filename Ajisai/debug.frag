@@ -292,64 +292,10 @@ void main() {
 
 	vec3 toCam = normalize(camPosition - objPosition);
 	vec3 specular = vec3(181.0f / 256.0f,166.0f / 256.0f,66.0f/ 256.0f) * 2.0f;
-	//vec3 specular = vec3(1.0f, 1.0f, 1.0f);
-	//vec3 color = SpecularIBL(specular, ubo.roughness.r, objNorm, toCam);
 	vec3 color = LTC(specular, ubo.roughness.r,objNorm,toCam, objPosition);
-
-	outColor = vec4(color, 1.0f);
-
-	//vec3 toLight = normalize(lightPosition - objPosition);
-	//vec3 h = normalize(toCam + toLight);
-
-	//float NoV = clamp(dot(objNorm, toCam) , 0.0f ,1.0f);
-	//float NoL = clamp(dot(objNorm, toLight), 0.0f, 1.0f);
-	//float NoH = clamp(dot(objNorm, h), 0.0f, 1.0f);
-	//float VoH = clamp(dot(toCam, h), 0.0f, 1.0f);
-
-	//vec3 color = vec3(0.0f);
-	//if( NoL > 0){
-	//	float roughness = 0.5f;
-	//	float alpha = roughness * roughness;
-//		float k = (roughness + 1) * (roughness + 1) / 8.0f;
-//
-//		float d = alpha * alpha / PI / pow((NoH * NoH * (alpha * alpha -1) + 1),2);
-//
-//		float gv = NoV / (NoV * (1 - k) + k);
-//		float gl = NoL / (NoL * (1 - k) + k);
-//		float G = gv * gl;
-//
-//		float Fc = pow(1 - VoH, 5);
-//
-//		vec3 F = (1 - Fc) * vec3(5.0f , 5.0f , 5.0f) + Fc;
-//
-//		color = d * F * G / (4.0f * NoV);
-//
-//	}
-//	else{
-//		color = vec3(0.0f);
-//	}
+    //vec3 specular = vec3(1.0f, 1.0f, 1.0f);
+	//vec3 color = SpecularIBL(specular, ubo.roughness.r, objNorm, toCam);
 	
 
-	//vec4 posWorld = vec4(texture(positionSampler, fragTexCoord).rgb , 1.0f);
-	//vec4 posLight = (ubo.matToFrustum * ubo.matToLight * posWorld);
-	//vec3 posLightFrustum = posLight.xyz / posLight.w;
-	//vec3 shadowTexCoord = posLightFrustum.xyz * 0.5 + 0.5;
-	//float closestDepth = texture(shadowMapSampler, shadowTexCoord.xy).r;
-	//float currentDepth = posLightFrustum.z;
-	//float shadowAtten = 0.0f;
-	//if (currentDepth - 0.02f  < closestDepth) shadowAtten = 1.0f;
-
-	//vec3 normWorld = normalize(texture(normalSampler, fragTexCoord).rgb);
-
-	//vec3 toLight = normalize(ubo.lightPosition.rgb - posWorld.rgb);
-	//float diffuseAtten = max(0, dot(toLight, normWorld));
-
-	//outColor = vec4(shadowAtten * diffuseAtten * vec3(1.0f,1.0f,1.0f), 1.0f);
-	//outColor = vec4(texture(normalSampler,fragTexCoord).rgb, 1.0f);
-	//outColor = vec4(color, 1.0f);
-	//outColor = vec4(texture(LTC_MAT,fragTexCoord).rgb,1.0f);
-
-	// calculate transformation matrix for local 
-    
-   
+	outColor = vec4(color, 1.0f);
 }

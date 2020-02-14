@@ -31,10 +31,13 @@ void main() {
 	fragNormal = mat3(transpose(inverse(ubo.matToWorld))) * inNormal;
 	//fragNormal = normalize(mat3(ubo.matToWorld) * inNormal);
 
-	vec3 T = normalize(mat3(ubo.matToWorld) * inTangent);
+	//vec3 T = normalize(mat3(ubo.matToWorld) * inTangent);
 	vec3 B = normalize(mat3(ubo.matToWorld) * inBitangent);
 	vec3 N = normalize(mat3(ubo.matToWorld) * inNormal);
-
+	vec3 T = normalize(cross(B, N));
+	//if(dot(cross(N,T),B) < 0.0f){
+	//	B = -1.0f * B;
+	//}
 	matTBN = mat3(T,B,N);
 
 	camPos = vec3(ubo.camPosition);

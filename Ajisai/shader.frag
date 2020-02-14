@@ -19,7 +19,7 @@ void main() {
 	vec3 direction = normalize(vec3(-0.5f,-0.1f,-0.5f));
 	vec3 lightColor = vec3(1.0f,1.0f,1.0f);
 
-	vec3 normLocal = normalize(texture(texSampler_normal, fragTexCoord).rgb * 2.0 - 1.0);
+	vec3 normLocal = normalize(normalize(texture(texSampler_normal, fragTexCoord).rgb) * 2.0 - 1.0);
 	vec3 normWorld = normalize(matTBN * normLocal);
 
 	// diffuse color
