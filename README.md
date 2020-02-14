@@ -1,5 +1,5 @@
 # Ajisai
-A real-time rendering demo based on Vulkan. A sample video can be found [here](https://youtu.be/Do81PN6Fack).
+A real-time rendering demo based on Vulkan. A sample video can be found [here](https://youtu.be/OGunMn06DJg).
 
 ## Required Libraries
 To compile this demo, the following third party libraries are required
